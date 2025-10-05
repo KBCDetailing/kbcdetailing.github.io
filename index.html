@@ -1,1100 +1,1283 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Users, FileText, Download, Trash2, Plus, Save, Calendar } from 'lucide-react';
-
-const AutoDetailingTracker = () => {
-  const [activeTab, setActiveTab] = useState('daily');
-  const [employees, setEmployees] = useState([]);
-  const [dailyEntries, setDailyEntries] = useState([]);
-  const [showEmployeeForm, setShowEmployeeForm] = useState(false);
-  
-  // Daily form state
-  const [dailyForm, setDailyForm] = useState({
-    date: new Date().toISOString().split('T')[0],
-    venmo: '',
-    check: '',
-    invoice: '',
-    zelle: '',
-    stripe: '',
-    cash: '',
-    employeeHours: {},
-    hunterTips: '',
-    hunterDraw: '',
-    hunterCheck: '',
-    kullenTips: '',
-    kullenDraw: '',
-    kullenCheck: '',
-    expenses: []
-  });
-
-  // Employee form state
-  const [employeeForm, setEmployeeForm] = useState({
-    name: '',
-    hourlyRate: ''
-  });
-
-  // Expense form state
-  const [expenseForm, setExpenseForm] = useState({
-    description: '',
-    amount: '',
-    category: 'Food'
-  });
-
-  // Load data from localStorage on mount
-  useEffect(() => {
-    const savedEmployees = localStorage.getItem('employees');
-    const savedEntries = localStorage.getItem('dailyEntries');
-    
-    if (savedEmployees) {
-      setEmployees(JSON.parse(savedEmployees));
-    }
-    if (savedEntries) {
-      setDailyEntries(JSON.parse(savedEntries));
-    }
-  }, []);
-
-  // Save to localStorage whenever data changes
-  useEffect(() => {
-    localStorage.setItem('employees', JSON.stringify(employees));
-  }, [employees]);
-
-  useEffect(() => {
-    localStorage.setItem('dailyEntries', JSON.stringify(dailyEntries));
-  }, [dailyEntries]);
-
-  // Initialize employee hours when employees change
-  useEffect(() => {
-    const newEmployeeHours = {};
-    employees.forEach(emp => {
-      newEmployeeHours[emp.id] = dailyForm.employeeHours[emp.id] || '';
-    });
-    setDailyForm(prev => ({ ...prev, employeeHours: newEmployeeHours }));
-  }, [employees]);
-
-  const addEmployee = () => {
-    if (employeeForm.name && employeeForm.hourlyRate) {
-      const newEmployee = {
-        id: Date.now().toString(),
-        name: employeeForm.name,
-        hourlyRate: parseFloat(employeeForm.hourlyRate)
-      };
-      setEmployees([...employees, newEmployee]);
-      setEmployeeForm({ name: '', hourlyRate: '' });
-      setShowEmployeeForm(false);
-    }
-  };
-
-  const deleteEmployee = (id) => {
-    setEmployees(employees.filter(emp => emp.id !== id));
-  };
-
-  const addExpense = () => {
-    if (expenseForm.description && expenseForm.amount) {
-      const newExpense = {
-        id: Date.now().toString(),
-        description: expenseForm.description,
-        amount: parseFloat(expenseForm.amount),
-        category: expenseForm.category
-      };
-      setDailyForm(prev => ({
-        ...prev,
-        expenses: [...prev.expenses, newExpense]
-      }));
-      setExpenseForm({ description: '', amount: '', category: 'Food' });
-    }
-  };
-
-  const removeExpense = (id) => {
-    setDailyForm(prev => ({
-      ...prev,
-      expenses: prev.expenses.filter(exp => exp.id !== id)
-    }));
-  };
-
-  const saveDailyEntry = () => {
-    const entry = {
-      ...dailyForm,
-      id: Date.now().toString(),
-      employeeData: employees.map(emp => ({
-        ...emp,
-        hours: parseFloat(dailyForm.employeeHours[emp.id] || 0),
-        pay: parseFloat(dailyForm.employeeHours[emp.id] || 0) * emp.hourlyRate
-      }))
-    };
-    
-    setDailyEntries([...dailyEntries, entry]);
-    
-    // Reset form
-    setDailyForm({
-      date: new Date().toISOString().split('T')[0],
-      venmo: '',
-      check: '',
-      invoice: '',
-      zelle: '',
-      stripe: '',
-      cash: '',
-      employeeHours: {},
-      hunterTips: '',
-      hunterDraw: '',
-      hunterCheck: '',
-      kullenTips: '',
-      kullenDraw: '',
-      kullenCheck: '',
-      expenses: []
-    });
-  };
-
-  const deleteDailyEntry = (id) => {
-    setDailyEntries(dailyEntries.filter(entry => entry.id !== id));
-  };
-
-  const getWeekRange = (date) => {
-    const d = new Date(date);
-    const day = d.getDay();
-    const diff = d.getDate() - day;
-    const sunday = new Date(d.setDate(diff));
-    const saturday = new Date(sunday);
-    saturday.setDate(sunday.getDate() + 6);
-    return { start: sunday, end: saturday };
-  };
-
-  const getCurrentWeekEntries = () => {
-    const today = new Date();
-    const { start, end } = getWeekRange(today);
-    
-    return dailyEntries.filter(entry => {
-      const entryDate = new Date(entry.date);
-      return entryDate >= start && entryDate <= end;
-    });
-  };
-
-  const getCurrentMonthEntries = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth();
-    
-    return dailyEntries.filter(entry => {
-      const entryDate = new Date(entry.date);
-      return entryDate.getFullYear() === year && entryDate.getMonth() === month;
-    });
-  };
-
-  const calculateTotals = (entries) => {
-    const totals = {
-      venmo: 0,
-      check: 0,
-      invoice: 0,
-      zelle: 0,
-      stripe: 0,
-      cash: 0,
-      employeePay: 0,
-      hunterTips: 0,
-      hunterDraw: 0,
-      hunterCheck: 0,
-      kullenTips: 0,
-      kullenDraw: 0,
-      kullenCheck: 0,
-      expenses: { Food: 0, Supplies: 0, 'Gas/Automotive': 0 },
-      employeeDetails: {}
-    };
-
-    entries.forEach(entry => {
-      totals.venmo += parseFloat(entry.venmo || 0);
-      totals.check += parseFloat(entry.check || 0);
-      totals.invoice += parseFloat(entry.invoice || 0);
-      totals.zelle += parseFloat(entry.zelle || 0);
-      totals.stripe += parseFloat(entry.stripe || 0);
-      totals.cash += parseFloat(entry.cash || 0);
-      
-      totals.hunterTips += parseFloat(entry.hunterTips || 0);
-      totals.hunterDraw += parseFloat(entry.hunterDraw || 0);
-      totals.hunterCheck += parseFloat(entry.hunterCheck || 0);
-      totals.kullenTips += parseFloat(entry.kullenTips || 0);
-      totals.kullenDraw += parseFloat(entry.kullenDraw || 0);
-      totals.kullenCheck += parseFloat(entry.kullenCheck || 0);
-
-      entry.employeeData?.forEach(emp => {
-        totals.employeePay += emp.pay;
-        if (!totals.employeeDetails[emp.name]) {
-          totals.employeeDetails[emp.name] = { hours: 0, pay: 0 };
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Detailing Business Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        totals.employeeDetails[emp.name].hours += emp.hours;
-        totals.employeeDetails[emp.name].pay += emp.pay;
-      });
 
-      entry.expenses.forEach(exp => {
-        totals.expenses[exp.category] += exp.amount;
-      });
-    });
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            line-height: 1.6;
+        }
 
-    const cashIncome = totals.cash;
-    const nonCashIncome = totals.venmo + totals.check + totals.invoice + totals.zelle + totals.stripe;
-    const grossIncome = cashIncome + nonCashIncome;
-    const taxTransfer = nonCashIncome * 0.30;
-    const totalExpenses = Object.values(totals.expenses).reduce((a, b) => a + b, 0);
-    const ownerPayouts = totals.hunterTips + totals.hunterDraw + totals.hunterCheck + 
-                         totals.kullenTips + totals.kullenDraw + totals.kullenCheck;
-    const netIncome = grossIncome - (totals.employeePay + ownerPayouts + totalExpenses + taxTransfer);
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
 
-    return { ...totals, cashIncome, nonCashIncome, grossIncome, taxTransfer, totalExpenses, ownerPayouts, netIncome };
-  };
+        .header {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
 
-  const exportToCSV = (type) => {
-    let entries = type === 'weekly' ? getCurrentWeekEntries() : getCurrentMonthEntries();
-    let csv = 'Date,Venmo,Check,Invoice,Zelle,Stripe,Cash,Employee Pay,Hunter Tips,Hunter Draw,Hunter Check,Kullen Tips,Kullen Draw,Kullen Check,Food,Supplies,Gas/Automotive\n';
-    
-    entries.forEach(entry => {
-      const expensesByCategory = { Food: 0, Supplies: 0, 'Gas/Automotive': 0 };
-      entry.expenses.forEach(exp => {
-        expensesByCategory[exp.category] += exp.amount;
-      });
-      const employeePay = entry.employeeData?.reduce((sum, emp) => sum + emp.pay, 0) || 0;
-      
-      csv += `${entry.date},${entry.venmo || 0},${entry.check || 0},${entry.invoice || 0},${entry.zelle || 0},${entry.stripe || 0},${entry.cash || 0},${employeePay},${entry.hunterTips || 0},${entry.hunterDraw || 0},${entry.hunterCheck || 0},${entry.kullenTips || 0},${entry.kullenDraw || 0},${entry.kullenCheck || 0},${expensesByCategory.Food},${expensesByCategory.Supplies},${expensesByCategory['Gas/Automotive']}\n`;
-    });
+        .header h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 8px;
+        }
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${type}-report-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-  };
+        .header p {
+            color: #666;
+        }
 
-  return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-3xl">💰</span>
-            <h1 className="text-3xl font-bold text-gray-900">Auto Detailing Business Tracker</h1>
-          </div>
-          <p className="text-gray-600">Track daily income and expenses</p>
+        .tabs {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            border-bottom: 2px solid #e5e5e5;
+        }
+
+        .tab {
+            padding: 16px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            color: #666;
+            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+
+        .tab:hover {
+            color: #333;
+        }
+
+        .tab.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        .content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .section {
+            margin-bottom: 32px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #333;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+
+        .btn-purple {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .btn-purple:hover {
+            background: #7c3aed;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #555;
+            font-size: 13px;
+        }
+
+        td {
+            font-size: 14px;
+            color: #333;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+
+        .stat-card.green {
+            background: #d1fae5;
+        }
+
+        .stat-card.blue {
+            background: #dbeafe;
+        }
+
+        .stat-card.red {
+            background: #fee2e2;
+        }
+
+        .stat-card.purple {
+            background: #ede9fe;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .stat-card.green .stat-value {
+            color: #059669;
+        }
+
+        .stat-card.blue .stat-value {
+            color: #2563eb;
+        }
+
+        .stat-card.red .stat-value {
+            color: #dc2626;
+        }
+
+        .stat-card.purple .stat-value {
+            color: #7c3aed;
+        }
+
+        .income-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .income-box {
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .income-label {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .income-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .owner-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-top: 16px;
+        }
+
+        .owner-card {
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .owner-card h4 {
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .owner-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+        }
+
+        .owner-row.total {
+            border-top: 2px solid #ddd;
+            margin-top: 8px;
+            padding-top: 8px;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 20px;
+            color: #999;
+        }
+
+        .expense-form {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 16px;
+        }
+
+        .employee-form {
+            display: grid;
+            grid-template-columns: 2fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+
+        .entry-card {
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .entry-date {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .entry-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 Auto Detailing Business Tracker</h1>
+            <p>Track daily income and expenses</p>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab('daily')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium ${
-                activeTab === 'daily'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Calendar size={20} />
-              Daily Input
-            </button>
-            <button
-              onClick={() => setActiveTab('weekly')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium ${
-                activeTab === 'weekly'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <FileText size={20} />
-              Weekly Report
-            </button>
-            <button
-              onClick={() => setActiveTab('monthly')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium ${
-                activeTab === 'monthly'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <FileText size={20} />
-              Monthly Report
-            </button>
-            <button
-              onClick={() => setActiveTab('employees')}
-              className={`flex items-center gap-2 px-6 py-3 font-medium ${
-                activeTab === 'employees'
-                  ? 'border-b-2 border-blue-500 text-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <Users size={20} />
-              Employees
-            </button>
-          </div>
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('daily')">📅 Daily Input</button>
+            <button class="tab" onclick="switchTab('weekly')">📊 Weekly Report</button>
+            <button class="tab" onclick="switchTab('monthly')">📈 Monthly Report</button>
+            <button class="tab" onclick="switchTab('employees')">👥 Employees</button>
         </div>
 
-        {/* Daily Input Tab */}
-        {activeTab === 'daily' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-bold mb-4">Add New Day</h2>
-              
-              {/* Date */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
-                <input
-                  type="date"
-                  value={dailyForm.date}
-                  onChange={(e) => setDailyForm({ ...dailyForm, date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                />
-              </div>
+        <div class="content">
+            <!-- Daily Input Tab -->
+            <div id="daily" class="tab-content active">
+                <div class="section">
+                    <div class="section-title">Add New Day</div>
+                    
+                    <div class="form-group" style="max-width: 300px; margin-bottom: 20px;">
+                        <label>Date</label>
+                        <input type="date" id="dailyDate">
+                    </div>
 
-              {/* Income Sources */}
-              <h3 className="font-semibold mb-3">Income Sources</h3>
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Venmo $</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={dailyForm.venmo}
-                    onChange={(e) => setDailyForm({ ...dailyForm, venmo: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Check $</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={dailyForm.check}
-                    onChange={(e) => setDailyForm({ ...dailyForm, check: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Invoice $</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={dailyForm.invoice}
-                    onChange={(e) => setDailyForm({ ...dailyForm, invoice: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Zelle $</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={dailyForm.zelle}
-                    onChange={(e) => setDailyForm({ ...dailyForm, zelle: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Stripe $</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={dailyForm.stripe}
-                    onChange={(e) => setDailyForm({ ...dailyForm, stripe: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cash $ (non-taxable)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={dailyForm.cash}
-                    onChange={(e) => setDailyForm({ ...dailyForm, cash: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  />
-                </div>
-              </div>
+                    <div class="section-title" style="font-size: 16px;">Income Sources</div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Venmo $</label>
+                            <input type="number" step="0.01" id="venmo" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Check $</label>
+                            <input type="number" step="0.01" id="check" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Invoice $</label>
+                            <input type="number" step="0.01" id="invoice" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Zelle $</label>
+                            <input type="number" step="0.01" id="zelle" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Stripe $</label>
+                            <input type="number" step="0.01" id="stripe" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Cash $ (non-taxable)</label>
+                            <input type="number" step="0.01" id="cash" placeholder="0.00">
+                        </div>
+                    </div>
 
-              {/* Employee Hours */}
-              {employees.length > 0 && (
-                <>
-                  <h3 className="font-semibold mb-3">Employee Hours</h3>
-                  <div className="grid grid-cols-3 gap-4 mb-6">
-                    {employees.map(emp => (
-                      <div key={emp.id}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {emp.name} (${emp.hourlyRate}/hr)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.5"
-                          value={dailyForm.employeeHours[emp.id] || ''}
-                          onChange={(e) => setDailyForm({
-                            ...dailyForm,
-                            employeeHours: { ...dailyForm.employeeHours, [emp.id]: e.target.value }
-                          })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                          placeholder="Hours"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+                    <div id="employeeHoursSection"></div>
 
-              {/* Owner Payouts */}
-              <h3 className="font-semibold mb-3">Owner Payouts</h3>
-              <div className="grid grid-cols-2 gap-6 mb-6">
-                <div>
-                  <h4 className="font-medium mb-2">Hunter</h4>
-                  <div className="space-y-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={dailyForm.hunterTips}
-                      onChange={(e) => setDailyForm({ ...dailyForm, hunterTips: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Tips"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={dailyForm.hunterDraw}
-                      onChange={(e) => setDailyForm({ ...dailyForm, hunterDraw: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Cash Draw"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={dailyForm.hunterCheck}
-                      onChange={(e) => setDailyForm({ ...dailyForm, hunterCheck: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Check Written"
-                    />
-                  </div>
+                    <div class="section-title" style="font-size: 16px; margin-top: 24px;">Owner Payouts</div>
+                    <div class="owner-grid">
+                        <div>
+                            <h4>Hunter</h4>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>Tips (cash)</label>
+                                <input type="number" step="0.01" id="hunterTips" placeholder="0.00">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>Cash Draw</label>
+                                <input type="number" step="0.01" id="hunterDraw" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Check Written</label>
+                                <input type="number" step="0.01" id="hunterCheck" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div>
+                            <h4>Kullen</h4>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>Tips (cash)</label>
+                                <input type="number" step="0.01" id="kullenTips" placeholder="0.00">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 8px;">
+                                <label>Cash Draw</label>
+                                <input type="number" step="0.01" id="kullenDraw" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Check Written</label>
+                                <input type="number" step="0.01" id="kullenCheck" placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-title" style="font-size: 16px; margin-top: 24px;">Expenses</div>
+                    <div class="expense-form">
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" id="expenseDesc" placeholder="Expense description">
+                        </div>
+                        <div class="form-group">
+                            <label>Amount $</label>
+                            <input type="number" step="0.01" id="expenseAmount" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="expenseCategory">
+                                <option value="Food">Food</option>
+                                <option value="Supplies">Supplies</option>
+                                <option value="Gas/Automotive">Gas/Automotive</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" onclick="addExpense()">+ Add</button>
+                    </div>
+
+                    <div id="expensesList"></div>
+
+                    <button class="btn btn-success" onclick="saveDailyEntry()" style="margin-top: 20px;">
+                        💾 Save Entry
+                    </button>
                 </div>
-                <div>
-                  <h4 className="font-medium mb-2">Kullen</h4>
-                  <div className="space-y-2">
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={dailyForm.kullenTips}
-                      onChange={(e) => setDailyForm({ ...dailyForm, kullenTips: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Tips"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={dailyForm.kullenDraw}
-                      onChange={(e) => setDailyForm({ ...dailyForm, kullenDraw: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Cash Draw"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={dailyForm.kullenCheck}
-                      onChange={(e) => setDailyForm({ ...dailyForm, kullenCheck: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Check Written"
-                    />
-                  </div>
+            </div>
+
+            <!-- Weekly Report Tab -->
+            <div id="weekly" class="tab-content">
+                <div class="top-bar">
+                    <div class="section-title">Weekly Report</div>
+                    <button class="btn btn-purple" onclick="exportCSV('weekly')">📥 Export CSV</button>
                 </div>
-              </div>
+                <div id="weeklyReport"></div>
+            </div>
 
-              {/* Expenses */}
-              <h3 className="font-semibold mb-3">Expenses</h3>
-              <div className="grid grid-cols-4 gap-4 mb-4">
-                <input
-                  type="text"
-                  value={expenseForm.description}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                  className="col-span-2 px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Description"
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={expenseForm.amount}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-md"
-                  placeholder="Amount"
-                />
-                <select
-                  value={expenseForm.category}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                  className="px-3 py-2 border border-gray-300 rounded-md"
-                >
-                  <option value="Food">Food</option>
-                  <option value="Supplies">Supplies</option>
-                  <option value="Gas/Automotive">Gas/Automotive</option>
-                </select>
-              </div>
-              <button
-                onClick={addExpense}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 mb-4"
-              >
-                <Plus size={16} />
-                Add Expense
-              </button>
+            <!-- Monthly Report Tab -->
+            <div id="monthly" class="tab-content">
+                <div class="top-bar">
+                    <div class="section-title">Monthly Report</div>
+                    <button class="btn btn-purple" onclick="exportCSV('monthly')">📥 Export CSV</button>
+                </div>
+                <div id="monthlyReport"></div>
+            </div>
 
-              {dailyForm.expenses.length > 0 && (
-                <div className="mb-6">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Description</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Amount</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Category</th>
-                        <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
-                      </tr>
+            <!-- Employees Tab -->
+            <div id="employees" class="tab-content">
+                <div class="top-bar">
+                    <div class="section-title">Employee Management</div>
+                    <button class="btn btn-primary" onclick="toggleEmployeeForm()">+ Add Employee</button>
+                </div>
+
+                <div id="employeeFormContainer" style="display: none;">
+                    <div class="employee-form">
+                        <div class="form-group">
+                            <label>Employee Name</label>
+                            <input type="text" id="employeeName" placeholder="Name">
+                        </div>
+                        <div class="form-group">
+                            <label>Hourly Rate $</label>
+                            <input type="number" step="0.01" id="employeeRate" placeholder="0.00">
+                        </div>
+                        <button class="btn btn-success" onclick="saveEmployee()">💾 Save</button>
+                    </div>
+                </div>
+
+                <div id="employeesList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize data
+        let employees = JSON.parse(localStorage.getItem('employees') || '[]');
+        let dailyEntries = JSON.parse(localStorage.getItem('dailyEntries') || '[]');
+        let tempExpenses = [];
+
+        // Initialize date to today
+        document.getElementById('dailyDate').valueAsDate = new Date();
+
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+
+            if (tabName === 'weekly') renderWeeklyReport();
+            if (tabName === 'monthly') renderMonthlyReport();
+            if (tabName === 'employees') renderEmployees();
+        }
+
+        // Employee management
+        function toggleEmployeeForm() {
+            const form = document.getElementById('employeeFormContainer');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function saveEmployee() {
+            const name = document.getElementById('employeeName').value.trim();
+            const rate = parseFloat(document.getElementById('employeeRate').value);
+
+            if (!name || !rate) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            employees.push({
+                id: Date.now().toString(),
+                name: name,
+                hourlyRate: rate
+            });
+
+            localStorage.setItem('employees', JSON.stringify(employees));
+            
+            document.getElementById('employeeName').value = '';
+            document.getElementById('employeeRate').value = '';
+            document.getElementById('employeeFormContainer').style.display = 'none';
+            
+            renderEmployees();
+            renderEmployeeHours();
+        }
+
+        function deleteEmployee(id) {
+            if (!confirm('Delete this employee?')) return;
+            employees = employees.filter(e => e.id !== id);
+            localStorage.setItem('employees', JSON.stringify(employees));
+            renderEmployees();
+            renderEmployeeHours();
+        }
+
+        function renderEmployees() {
+            const container = document.getElementById('employeesList');
+            
+            if (employees.length === 0) {
+                container.innerHTML = '<div class="empty-state">No employees added yet</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Hourly Rate</th>
+                            <th>Action</th>
+                        </tr>
                     </thead>
                     <tbody>
-                      {dailyForm.expenses.map(exp => (
-                        <tr key={exp.id} className="border-t">
-                          <td className="px-4 py-2">{exp.description}</td>
-                          <td className="px-4 py-2">${exp.amount.toFixed(2)}</td>
-                          <td className="px-4 py-2">{exp.category}</td>
-                          <td className="px-4 py-2">
-                            <button
-                              onClick={() => removeExpense(exp.id)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                        ${employees.map(emp => `
+                            <tr>
+                                <td>${emp.name}</td>
+                                <td>$${emp.hourlyRate.toFixed(2)}/hr</td>
+                                <td>
+                                    <button class="btn btn-danger" onclick="deleteEmployee('${emp.id}')">
+                                        🗑️ Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
                     </tbody>
-                  </table>
+                </table>
+            `;
+        }
+
+        function renderEmployeeHours() {
+            const container = document.getElementById('employeeHoursSection');
+            
+            if (employees.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="section-title" style="font-size: 16px; margin-top: 24px;">Employee Hours</div>
+                <div class="form-grid">
+                    ${employees.map(emp => `
+                        <div class="form-group">
+                            <label>${emp.name} ($${emp.hourlyRate}/hr)</label>
+                            <input type="number" step="0.5" id="empHours_${emp.id}" placeholder="Hours" value="0">
+                        </div>
+                    `).join('')}
                 </div>
-              )}
+            `;
+        }
 
-              <button
-                onClick={saveDailyEntry}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700"
-              >
-                <Save size={20} />
-                Save Entry
-              </button>
-            </div>
-          </div>
-        )}
+        // Expense management
+        function addExpense() {
+            const desc = document.getElementById('expenseDesc').value.trim();
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const category = document.getElementById('expenseCategory').value;
 
-        {/* Weekly Report Tab */}
-        {activeTab === 'weekly' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Weekly Report</h2>
-                <button
-                  onClick={() => exportToCSV('weekly')}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                >
-                  <Download size={16} />
-                  Export CSV
-                </button>
-              </div>
+            if (!desc || !amount) {
+                alert('Please fill in description and amount');
+                return;
+            }
 
-              {(() => {
-                const entries = getCurrentWeekEntries();
-                const totals = calculateTotals(entries);
+            tempExpenses.push({
+                id: Date.now().toString(),
+                description: desc,
+                amount: amount,
+                category: category
+            });
 
-                return (
-                  <>
-                    <div className="grid grid-cols-4 gap-4 mb-6">
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Gross Income</div>
-                        <div className="text-2xl font-bold text-green-600">
-                          ${totals.grossIncome.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Non-Cash Income (Taxable)</div>
-                        <div className="text-2xl font-bold text-blue-600">
-                          ${totals.nonCashIncome.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Tax Transfer (30%)</div>
-                        <div className="text-2xl font-bold text-red-600">
-                          ${totals.taxTransfer.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-purple-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Net Income</div>
-                        <div className="text-2xl font-bold text-purple-600">
-                          ${totals.netIncome.toFixed(2)}
-                        </div>
-                      </div>
-                    </div>
+            document.getElementById('expenseDesc').value = '';
+            document.getElementById('expenseAmount').value = '';
+            
+            renderExpenses();
+        }
 
-                    <h3 className="font-semibold mb-2">Income Breakdown</h3>
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Venmo</div>
-                        <div className="font-semibold">${totals.venmo.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Check</div>
-                        <div className="font-semibold">${totals.check.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Invoice</div>
-                        <div className="font-semibold">${totals.invoice.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Zelle</div>
-                        <div className="font-semibold">${totals.zelle.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Stripe</div>
-                        <div className="font-semibold">${totals.stripe.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Cash (non-taxable)</div>
-                        <div className="font-semibold">${totals.cash.toFixed(2)}</div>
-                      </div>
-                    </div>
+        function removeExpense(id) {
+            tempExpenses = tempExpenses.filter(e => e.id !== id);
+            renderExpenses();
+        }
 
-                    {Object.keys(totals.employeeDetails).length > 0 && (
-                      <>
-                        <h3 className="font-semibold mb-2">Employee Summary</h3>
-                        <table className="w-full mb-6">
-                          <thead className="bg-gray-50">
+        function renderExpenses() {
+            const container = document.getElementById('expensesList');
+            
+            if (tempExpenses.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Description</th>
+                            <th>Amount</th>
+                            <th>Category</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tempExpenses.map(exp => `
                             <tr>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total Hours</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total Pay</th>
+                                <td>${exp.description}</td>
+                                <td>$${exp.amount.toFixed(2)}</td>
+                                <td>${exp.category}</td>
+                                <td>
+                                    <button class="btn btn-danger" onclick="removeExpense('${exp.id}')">
+                                        🗑️
+                                    </button>
+                                </td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {Object.entries(totals.employeeDetails).map(([name, data]) => (
-                              <tr key={name} className="border-t">
-                                <td className="px-4 py-2">{name}</td>
-                                <td className="px-4 py-2">{data.hours.toFixed(1)}</td>
-                                <td className="px-4 py-2">${data.pay.toFixed(2)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </>
-                    )}
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
 
-                    <h3 className="font-semibold mb-2">Owner Payouts</h3>
-                    <div className="grid grid-cols-2 gap-6 mb-6">
-                      <div>
-                        <h4 className="font-medium mb-2">Hunter</h4>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Tips:</span>
-                            <span className="font-semibold">${totals.hunterTips.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Cash Draw:</span>
-                            <span className="font-semibold">${totals.hunterDraw.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Checks:</span>
-                            <span className="font-semibold">${totals.hunterCheck.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between border-t pt-1">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-semibold">${(totals.hunterTips + totals.hunterDraw + totals.hunterCheck).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Kullen</h4>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Tips:</span>
-                            <span className="font-semibold">${totals.kullenTips.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Cash Draw:</span>
-                            <span className="font-semibold">${totals.kullenDraw.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Checks:</span>
-                            <span className="font-semibold">${totals.kullenCheck.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between border-t pt-1">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-semibold">${(totals.kullenTips + totals.kullenDraw + totals.kullenCheck).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
+        // Save daily entry
+        function saveDailyEntry() {
+            const date = document.getElementById('dailyDate').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+
+            const entry = {
+                id: Date.now().toString(),
+                date: date,
+                venmo: parseFloat(document.getElementById('venmo').value || 0),
+                check: parseFloat(document.getElementById('check').value || 0),
+                invoice: parseFloat(document.getElementById('invoice').value || 0),
+                zelle: parseFloat(document.getElementById('zelle').value || 0),
+                stripe: parseFloat(document.getElementById('stripe').value || 0),
+                cash: parseFloat(document.getElementById('cash').value || 0),
+                hunterTips: parseFloat(document.getElementById('hunterTips').value || 0),
+                hunterDraw: parseFloat(document.getElementById('hunterDraw').value || 0),
+                hunterCheck: parseFloat(document.getElementById('hunterCheck').value || 0),
+                kullenTips: parseFloat(document.getElementById('kullenTips').value || 0),
+                kullenDraw: parseFloat(document.getElementById('kullenDraw').value || 0),
+                kullenCheck: parseFloat(document.getElementById('kullenCheck').value || 0),
+                expenses: [...tempExpenses],
+                employeeData: employees.map(emp => {
+                    const hours = parseFloat(document.getElementById(`empHours_${emp.id}`).value || 0);
+                    return {
+                        id: emp.id,
+                        name: emp.name,
+                        hours: hours,
+                        rate: emp.hourlyRate,
+                        pay: hours * emp.hourlyRate
+                    };
+                })
+            };
+
+            dailyEntries.push(entry);
+            localStorage.setItem('dailyEntries', JSON.stringify(dailyEntries));
+
+            // Reset form
+            document.getElementById('dailyDate').valueAsDate = new Date();
+            document.getElementById('venmo').value = '';
+            document.getElementById('check').value = '';
+            document.getElementById('invoice').value = '';
+            document.getElementById('zelle').value = '';
+            document.getElementById('stripe').value = '';
+            document.getElementById('cash').value = '';
+            document.getElementById('hunterTips').value = '';
+            document.getElementById('hunterDraw').value = '';
+            document.getElementById('hunterCheck').value = '';
+            document.getElementById('kullenTips').value = '';
+            document.getElementById('kullenDraw').value = '';
+            document.getElementById('kullenCheck').value = '';
+            
+            employees.forEach(emp => {
+                const input = document.getElementById(`empHours_${emp.id}`);
+                if (input) input.value = '0';
+            });
+            
+            tempExpenses = [];
+            renderExpenses();
+
+            alert('Entry saved successfully!');
+        }
+
+        function deleteDailyEntry(id) {
+            if (!confirm('Delete this entry?')) return;
+            dailyEntries = dailyEntries.filter(e => e.id !== id);
+            localStorage.setItem('dailyEntries', JSON.stringify(dailyEntries));
+            renderWeeklyReport();
+            renderMonthlyReport();
+        }
+
+        // Get week range
+        function getWeekRange(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day;
+            const sunday = new Date(d.setDate(diff));
+            sunday.setHours(0, 0, 0, 0);
+            const saturday = new Date(sunday);
+            saturday.setDate(sunday.getDate() + 6);
+            saturday.setHours(23, 59, 59, 999);
+            return { start: sunday, end: saturday };
+        }
+
+        function getCurrentWeekEntries() {
+            const { start, end } = getWeekRange(new Date());
+            return dailyEntries.filter(entry => {
+                const entryDate = new Date(entry.date);
+                return entryDate >= start && entryDate <= end;
+            });
+        }
+
+        function getCurrentMonthEntries() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth();
+            
+            return dailyEntries.filter(entry => {
+                const entryDate = new Date(entry.date);
+                return entryDate.getFullYear() === year && entryDate.getMonth() === month;
+            });
+        }
+
+        function calculateTotals(entries) {
+            const totals = {
+                venmo: 0, check: 0, invoice: 0, zelle: 0, stripe: 0, cash: 0,
+                employeePay: 0,
+                hunterTips: 0, hunterDraw: 0, hunterCheck: 0,
+                kullenTips: 0, kullenDraw: 0, kullenCheck: 0,
+                expenses: { Food: 0, Supplies: 0, 'Gas/Automotive': 0 },
+                employeeDetails: {}
+            };
+
+            entries.forEach(entry => {
+                totals.venmo += entry.venmo;
+                totals.check += entry.check;
+                totals.invoice += entry.invoice;
+                totals.zelle += entry.zelle;
+                totals.stripe += entry.stripe;
+                totals.cash += entry.cash;
+                
+                totals.hunterTips += entry.hunterTips;
+                totals.hunterDraw += entry.hunterDraw;
+                totals.hunterCheck += entry.hunterCheck;
+                totals.kullenTips += entry.kullenTips;
+                totals.kullenDraw += entry.kullenDraw;
+                totals.kullenCheck += entry.kullenCheck;
+
+                entry.employeeData?.forEach(emp => {
+                    totals.employeePay += emp.pay;
+                    if (!totals.employeeDetails[emp.name]) {
+                        totals.employeeDetails[emp.name] = { hours: 0, pay: 0 };
+                    }
+                    totals.employeeDetails[emp.name].hours += emp.hours;
+                    totals.employeeDetails[emp.name].pay += emp.pay;
+                });
+
+                entry.expenses.forEach(exp => {
+                    totals.expenses[exp.category] += exp.amount;
+                });
+            });
+
+            const cashIncome = totals.cash;
+            const nonCashIncome = totals.venmo + totals.check + totals.invoice + totals.zelle + totals.stripe;
+            const grossIncome = cashIncome + nonCashIncome;
+            const taxTransfer = nonCashIncome * 0.30;
+            const totalExpenses = Object.values(totals.expenses).reduce((a, b) => a + b, 0);
+            const ownerPayouts = totals.hunterTips + totals.hunterDraw + totals.hunterCheck + 
+                                 totals.kullenTips + totals.kullenDraw + totals.kullenCheck;
+            const netIncome = grossIncome - (totals.employeePay + ownerPayouts + totalExpenses + taxTransfer);
+
+            return { ...totals, cashIncome, nonCashIncome, grossIncome, taxTransfer, totalExpenses, ownerPayouts, netIncome };
+        }
+
+        function renderWeeklyReport() {
+            const entries = getCurrentWeekEntries();
+            const totals = calculateTotals(entries);
+            const container = document.getElementById('weeklyReport');
+
+            container.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="stat-label">Gross Income</div>
+                        <div class="stat-value">$${totals.grossIncome.toFixed(2)}</div>
                     </div>
-
-                    <h3 className="font-semibold mb-2">Expenses by Category</h3>
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Food</div>
-                        <div className="font-semibold">${totals.expenses.Food.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Supplies</div>
-                        <div className="font-semibold">${totals.expenses.Supplies.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Gas/Automotive</div>
-                        <div className="font-semibold">${totals.expenses['Gas/Automotive'].toFixed(2)}</div>
-                      </div>
+                    <div class="stat-card blue">
+                        <div class="stat-label">Non-Cash Income (Taxable)</div>
+                        <div class="stat-value">${totals.nonCashIncome.toFixed(2)}</div>
                     </div>
-
-                    <h3 className="font-semibold mb-2">Daily Entries ({entries.length})</h3>
-                    {entries.length === 0 ? (
-                      <p className="text-gray-500 text-center py-8">No entries for this week</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {entries.map(entry => (
-                          <div key={entry.id} className="border rounded-lg p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="font-semibold">{new Date(entry.date).toLocaleDateString()}</div>
-                              <button
-                                onClick={() => deleteDailyEntry(entry.id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-sm">
-                              {parseFloat(entry.venmo || 0) > 0 && <div>Venmo: ${parseFloat(entry.venmo).toFixed(2)}</div>}
-                              {parseFloat(entry.check || 0) > 0 && <div>Check: ${parseFloat(entry.check).toFixed(2)}</div>}
-                              {parseFloat(entry.invoice || 0) > 0 && <div>Invoice: ${parseFloat(entry.invoice).toFixed(2)}</div>}
-                              {parseFloat(entry.zelle || 0) > 0 && <div>Zelle: ${parseFloat(entry.zelle).toFixed(2)}</div>}
-                              {parseFloat(entry.stripe || 0) > 0 && <div>Stripe: ${parseFloat(entry.stripe).toFixed(2)}</div>}
-                              {parseFloat(entry.cash || 0) > 0 && <div>Cash: ${parseFloat(entry.cash).toFixed(2)}</div>}
-                            </div>
-                            {entry.employeeData && entry.employeeData.some(e => e.hours > 0) && (
-                              <div className="mt-2 text-sm">
-                                <strong>Employees:</strong> {entry.employeeData.filter(e => e.hours > 0).map(e => `${e.name} (${e.hours}h)`).join(', ')}
-                              </div>
-                            )}
-                            {entry.expenses.length > 0 && (
-                              <div className="mt-2 text-sm">
-                                <strong>Expenses:</strong> {entry.expenses.map(e => `${e.description} (${e.amount.toFixed(2)})`).join(', ')}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* Monthly Report Tab */}
-        {activeTab === 'monthly' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Monthly Report</h2>
-                <button
-                  onClick={() => exportToCSV('monthly')}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                >
-                  <Download size={16} />
-                  Export CSV
-                </button>
-              </div>
-
-              {(() => {
-                const entries = getCurrentMonthEntries();
-                const totals = calculateTotals(entries);
-
-                return (
-                  <>
-                    <div className="grid grid-cols-4 gap-4 mb-6">
-                      <div className="bg-green-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Gross Income</div>
-                        <div className="text-2xl font-bold text-green-600">
-                          ${totals.grossIncome.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-blue-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Non-Cash Income (Taxable)</div>
-                        <div className="text-2xl font-bold text-blue-600">
-                          ${totals.nonCashIncome.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-red-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Tax Transfer (30%)</div>
-                        <div className="text-2xl font-bold text-red-600">
-                          ${totals.taxTransfer.toFixed(2)}
-                        </div>
-                      </div>
-                      <div className="bg-purple-50 p-4 rounded-lg">
-                        <div className="text-sm text-gray-600 mb-1">Net Income</div>
-                        <div className="text-2xl font-bold text-purple-600">
-                          ${totals.netIncome.toFixed(2)}
-                        </div>
-                      </div>
+                    <div class="stat-card red">
+                        <div class="stat-label">Tax Transfer (30%)</div>
+                        <div class="stat-value">${totals.taxTransfer.toFixed(2)}</div>
                     </div>
-
-                    <h3 className="font-semibold mb-2">Income Breakdown</h3>
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Venmo</div>
-                        <div className="font-semibold">${totals.venmo.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Check</div>
-                        <div className="font-semibold">${totals.check.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Invoice</div>
-                        <div className="font-semibold">${totals.invoice.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Zelle</div>
-                        <div className="font-semibold">${totals.zelle.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Stripe</div>
-                        <div className="font-semibold">${totals.stripe.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Cash (non-taxable)</div>
-                        <div className="font-semibold">${totals.cash.toFixed(2)}</div>
-                      </div>
+                    <div class="stat-card purple">
+                        <div class="stat-label">Net Income</div>
+                        <div class="stat-value">${totals.netIncome.toFixed(2)}</div>
                     </div>
+                </div>
 
-                    {Object.keys(totals.employeeDetails).length > 0 && (
-                      <>
-                        <h3 className="font-semibold mb-2">Employee Summary</h3>
-                        <table className="w-full mb-6">
-                          <thead className="bg-gray-50">
+                <h3 style="font-weight: 600; margin-bottom: 12px;">Income Breakdown</h3>
+                <div class="income-grid">
+                    <div class="income-box">
+                        <div class="income-label">Venmo</div>
+                        <div class="income-value">${totals.venmo.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Check</div>
+                        <div class="income-value">${totals.check.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Invoice</div>
+                        <div class="income-value">${totals.invoice.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Zelle</div>
+                        <div class="income-value">${totals.zelle.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Stripe</div>
+                        <div class="income-value">${totals.stripe.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Cash (non-taxable)</div>
+                        <div class="income-value">${totals.cash.toFixed(2)}</div>
+                    </div>
+                </div>
+
+                ${Object.keys(totals.employeeDetails).length > 0 ? `
+                    <h3 style="font-weight: 600; margin: 24px 0 12px;">Employee Summary</h3>
+                    <table>
+                        <thead>
                             <tr>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total Hours</th>
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total Pay</th>
+                                <th>Name</th>
+                                <th>Total Hours</th>
+                                <th>Total Pay</th>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {Object.entries(totals.employeeDetails).map(([name, data]) => (
-                              <tr key={name} className="border-t">
-                                <td className="px-4 py-2">{name}</td>
-                                <td className="px-4 py-2">{data.hours.toFixed(1)}</td>
-                                <td className="px-4 py-2">${data.pay.toFixed(2)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </>
-                    )}
-
-                    <h3 className="font-semibold mb-2">Owner Payouts</h3>
-                    <div className="grid grid-cols-2 gap-6 mb-6">
-                      <div>
-                        <h4 className="font-medium mb-2">Hunter</h4>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Tips:</span>
-                            <span className="font-semibold">${totals.hunterTips.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Cash Draw:</span>
-                            <span className="font-semibold">${totals.hunterDraw.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Checks:</span>
-                            <span className="font-semibold">${totals.hunterCheck.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between border-t pt-1">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-semibold">${(totals.hunterTips + totals.hunterDraw + totals.hunterCheck).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h4 className="font-medium mb-2">Kullen</h4>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span>Tips:</span>
-                            <span className="font-semibold">${totals.kullenTips.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Cash Draw:</span>
-                            <span className="font-semibold">${totals.kullenDraw.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Checks:</span>
-                            <span className="font-semibold">${totals.kullenCheck.toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between border-t pt-1">
-                            <span className="font-semibold">Total:</span>
-                            <span className="font-semibold">${(totals.kullenTips + totals.kullenDraw + totals.kullenCheck).toFixed(2)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <h3 className="font-semibold mb-2">Expenses by Category</h3>
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Food</div>
-                        <div className="font-semibold">${totals.expenses.Food.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Supplies</div>
-                        <div className="font-semibold">${totals.expenses.Supplies.toFixed(2)}</div>
-                      </div>
-                      <div className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm text-gray-600">Gas/Automotive</div>
-                        <div className="font-semibold">${totals.expenses['Gas/Automotive'].toFixed(2)}</div>
-                      </div>
-                    </div>
-
-                    <h3 className="font-semibold mb-2">All Expenses This Month</h3>
-                    {entries.length === 0 || entries.every(e => e.expenses.length === 0) ? (
-                      <p className="text-gray-500 text-center py-4">No expenses this month</p>
-                    ) : (
-                      <table className="w-full mb-6">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Date</th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Description</th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Category</th>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Amount</th>
-                          </tr>
                         </thead>
                         <tbody>
-                          {entries.flatMap(entry =>
-                            entry.expenses.map(exp => (
-                              <tr key={`${entry.id}-${exp.id}`} className="border-t">
-                                <td className="px-4 py-2">{new Date(entry.date).toLocaleDateString()}</td>
-                                <td className="px-4 py-2">{exp.description}</td>
-                                <td className="px-4 py-2">{exp.category}</td>
-                                <td className="px-4 py-2">${exp.amount.toFixed(2)}</td>
-                              </tr>
-                            ))
-                          )}
+                            ${Object.entries(totals.employeeDetails).map(([name, data]) => `
+                                <tr>
+                                    <td>${name}</td>
+                                    <td>${data.hours.toFixed(1)}</td>
+                                    <td>${data.pay.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
                         </tbody>
-                      </table>
-                    )}
+                    </table>
+                ` : ''}
 
-                    <h3 className="font-semibold mb-2">Daily Entries ({entries.length})</h3>
-                    {entries.length === 0 ? (
-                      <p className="text-gray-500 text-center py-8">No entries for this month</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {entries.map(entry => (
-                          <div key={entry.id} className="border rounded-lg p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="font-semibold">{new Date(entry.date).toLocaleDateString()}</div>
-                              <button
-                                onClick={() => deleteDailyEntry(entry.id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-sm">
-                              {parseFloat(entry.venmo || 0) > 0 && <div>Venmo: ${parseFloat(entry.venmo).toFixed(2)}</div>}
-                              {parseFloat(entry.check || 0) > 0 && <div>Check: ${parseFloat(entry.check).toFixed(2)}</div>}
-                              {parseFloat(entry.invoice || 0) > 0 && <div>Invoice: ${parseFloat(entry.invoice).toFixed(2)}</div>}
-                              {parseFloat(entry.zelle || 0) > 0 && <div>Zelle: ${parseFloat(entry.zelle).toFixed(2)}</div>}
-                              {parseFloat(entry.stripe || 0) > 0 && <div>Stripe: ${parseFloat(entry.stripe).toFixed(2)}</div>}
-                              {parseFloat(entry.cash || 0) > 0 && <div>Cash: ${parseFloat(entry.cash).toFixed(2)}</div>}
-                            </div>
-                            {entry.employeeData && entry.employeeData.some(e => e.hours > 0) && (
-                              <div className="mt-2 text-sm">
-                                <strong>Employees:</strong> {entry.employeeData.filter(e => e.hours > 0).map(e => `${e.name} (${e.hours}h)`).join(', ')}
-                              </div>
-                            )}
-                            {entry.expenses.length > 0 && (
-                              <div className="mt-2 text-sm">
-                                <strong>Expenses:</strong> {entry.expenses.map(e => `${e.description} (${e.amount.toFixed(2)})`).join(', ')}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        )}
-
-        {/* Employees Tab */}
-        {activeTab === 'employees' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Employee Management</h2>
-                <button
-                  onClick={() => setShowEmployeeForm(!showEmployeeForm)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  <Plus size={16} />
-                  Add Employee
-                </button>
-              </div>
-
-              {showEmployeeForm && (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <input
-                      type="text"
-                      value={employeeForm.name}
-                      onChange={(e) => setEmployeeForm({ ...employeeForm, name: e.target.value })}
-                      className="px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Employee Name"
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={employeeForm.hourlyRate}
-                      onChange={(e) => setEmployeeForm({ ...employeeForm, hourlyRate: e.target.value })}
-                      className="px-3 py-2 border border-gray-300 rounded-md"
-                      placeholder="Hourly Rate"
-                    />
-                  </div>
-                  <button
-                    onClick={addEmployee}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                  >
-                    <Save size={16} />
-                    Save Employee
-                  </button>
+                <h3 style="font-weight: 600; margin: 24px 0 12px;">Owner Payouts</h3>
+                <div class="owner-grid">
+                    <div class="owner-card">
+                        <h4>Hunter</h4>
+                        <div class="owner-row">
+                            <span>Tips:</span>
+                            <span>${totals.hunterTips.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Cash Draw:</span>
+                            <span>${totals.hunterDraw.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Checks:</span>
+                            <span>${totals.hunterCheck.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row total">
+                            <span>Total:</span>
+                            <span>${(totals.hunterTips + totals.hunterDraw + totals.hunterCheck).toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="owner-card">
+                        <h4>Kullen</h4>
+                        <div class="owner-row">
+                            <span>Tips:</span>
+                            <span>${totals.kullenTips.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Cash Draw:</span>
+                            <span>${totals.kullenDraw.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Checks:</span>
+                            <span>${totals.kullenCheck.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row total">
+                            <span>Total:</span>
+                            <span>${(totals.kullenTips + totals.kullenDraw + totals.kullenCheck).toFixed(2)}</span>
+                        </div>
+                    </div>
                 </div>
-              )}
 
-              {employees.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No employees added yet</p>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Hourly Rate</th>
-                      <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {employees.map(emp => (
-                      <tr key={emp.id} className="border-t">
-                        <td className="px-4 py-2">{emp.name}</td>
-                        <td className="px-4 py-2">${emp.hourlyRate.toFixed(2)}/hr</td>
-                        <td className="px-4 py-2">
-                          <button
-                            onClick={() => deleteEmployee(emp.id)}
-                            className="flex items-center gap-1 text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 size={16} />
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
+                <h3 style="font-weight: 600; margin: 24px 0 12px;">Expenses by Category</h3>
+                <div class="income-grid">
+                    <div class="income-box">
+                        <div class="income-label">Food</div>
+                        <div class="income-value">${totals.expenses.Food.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Supplies</div>
+                        <div class="income-value">${totals.expenses.Supplies.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Gas/Automotive</div>
+                        <div class="income-value">${totals.expenses['Gas/Automotive'].toFixed(2)}</div>
+                    </div>
+                </div>
 
-export default AutoDetailingTracker;
+                <h3 style="font-weight: 600; margin: 24px 0 12px;">Daily Entries (${entries.length})</h3>
+                ${entries.length === 0 ? '<div class="empty-state">No entries for this week</div>' : `
+                    <div>
+                        ${entries.map(entry => `
+                            <div class="entry-card">
+                                <div class="entry-header">
+                                    <div class="entry-date">${new Date(entry.date).toLocaleDateString()}</div>
+                                    <button class="btn btn-danger" onclick="deleteDailyEntry('${entry.id}')">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                                <div class="entry-details">
+                                    ${entry.venmo > 0 ? `<div>Venmo: ${entry.venmo.toFixed(2)}</div>` : ''}
+                                    ${entry.check > 0 ? `<div>Check: ${entry.check.toFixed(2)}</div>` : ''}
+                                    ${entry.invoice > 0 ? `<div>Invoice: ${entry.invoice.toFixed(2)}</div>` : ''}
+                                    ${entry.zelle > 0 ? `<div>Zelle: ${entry.zelle.toFixed(2)}</div>` : ''}
+                                    ${entry.stripe > 0 ? `<div>Stripe: ${entry.stripe.toFixed(2)}</div>` : ''}
+                                    ${entry.cash > 0 ? `<div>Cash: ${entry.cash.toFixed(2)}</div>` : ''}
+                                </div>
+                                ${entry.employeeData && entry.employeeData.some(e => e.hours > 0) ? `
+                                    <div style="margin-top: 8px; font-size: 13px;">
+                                        <strong>Employees:</strong> ${entry.employeeData.filter(e => e.hours > 0).map(e => `${e.name} (${e.hours}h)`).join(', ')}
+                                    </div>
+                                ` : ''}
+                                ${entry.expenses.length > 0 ? `
+                                    <div style="margin-top: 8px; font-size: 13px;">
+                                        <strong>Expenses:</strong> ${entry.expenses.map(e => `${e.description} (${e.amount.toFixed(2)})`).join(', ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            `;
+        }
+
+        function renderMonthlyReport() {
+            const entries = getCurrentMonthEntries();
+            const totals = calculateTotals(entries);
+            const container = document.getElementById('monthlyReport');
+
+            container.innerHTML = `
+                <div class="stats-grid">
+                    <div class="stat-card green">
+                        <div class="stat-label">Gross Income</div>
+                        <div class="stat-value">${totals.grossIncome.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card blue">
+                        <div class="stat-label">Non-Cash Income (Taxable)</div>
+                        <div class="stat-value">${totals.nonCashIncome.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card red">
+                        <div class="stat-label">Tax Transfer (30%)</div>
+                        <div class="stat-value">${totals.taxTransfer.toFixed(2)}</div>
+                    </div>
+                    <div class="stat-card purple">
+                        <div class="stat-label">Net Income</div>
+                        <div class="stat-value">${totals.netIncome.toFixed(2)}</div>
+                    </div>
+                </div>
+
+                <h3 style="font-weight: 600; margin-bottom: 12px;">Income Breakdown</h3>
+                <div class="income-grid">
+                    <div class="income-box">
+                        <div class="income-label">Venmo</div>
+                        <div class="income-value">${totals.venmo.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Check</div>
+                        <div class="income-value">${totals.check.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Invoice</div>
+                        <div class="income-value">${totals.invoice.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Zelle</div>
+                        <div class="income-value">${totals.zelle.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Stripe</div>
+                        <div class="income-value">${totals.stripe.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Cash (non-taxable)</div>
+                        <div class="income-value">${totals.cash.toFixed(2)}</div>
+                    </div>
+                </div>
+
+                ${Object.keys(totals.employeeDetails).length > 0 ? `
+                    <h3 style="font-weight: 600; margin: 24px 0 12px;">Employee Summary</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Total Hours</th>
+                                <th>Total Pay</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(totals.employeeDetails).map(([name, data]) => `
+                                <tr>
+                                    <td>${name}</td>
+                                    <td>${data.hours.toFixed(1)}</td>
+                                    <td>${data.pay.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                ` : ''}
+
+                <h3 style="font-weight: 600; margin: 24px 0 12px;">Owner Payouts</h3>
+                <div class="owner-grid">
+                    <div class="owner-card">
+                        <h4>Hunter</h4>
+                        <div class="owner-row">
+                            <span>Tips:</span>
+                            <span>${totals.hunterTips.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Cash Draw:</span>
+                            <span>${totals.hunterDraw.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Checks:</span>
+                            <span>${totals.hunterCheck.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row total">
+                            <span>Total:</span>
+                            <span>${(totals.hunterTips + totals.hunterDraw + totals.hunterCheck).toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div class="owner-card">
+                        <h4>Kullen</h4>
+                        <div class="owner-row">
+                            <span>Tips:</span>
+                            <span>${totals.kullenTips.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Cash Draw:</span>
+                            <span>${totals.kullenDraw.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row">
+                            <span>Checks:</span>
+                            <span>${totals.kullenCheck.toFixed(2)}</span>
+                        </div>
+                        <div class="owner-row total">
+                            <span>Total:</span>
+                            <span>${(totals.kullenTips + totals.kullenDraw + totals.kullenCheck).toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="font-weight: 600; margin: 24px 0 12px;">Expenses by Category</h3>
+                <div class="income-grid">
+                    <div class="income-box">
+                        <div class="income-label">Food</div>
+                        <div class="income-value">${totals.expenses.Food.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Supplies</div>
+                        <div class="income-value">${totals.expenses.Supplies.toFixed(2)}</div>
+                    </div>
+                    <div class="income-box">
+                        <div class="income-label">Gas/Automotive</div>
+                        <div class="income-value">${totals.expenses['Gas/Automotive'].toFixed(2)}</div>
+                    </div>
+                </div>
+
+                ${entries.length > 0 && entries.some(e => e.expenses.length > 0) ? `
+                    <h3 style="font-weight: 600; margin: 24px 0 12px;">All Expenses This Month</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${entries.flatMap(entry =>
+                                entry.expenses.map(exp => `
+                                    <tr>
+                                        <td>${new Date(entry.date).toLocaleDateString()}</td>
+                                        <td>${exp.description}</td>
+                                        <td>${exp.category}</td>
+                                        <td>${exp.amount.toFixed(2)}</td>
+                                    </tr>
+                                `)
+                            ).join('')}
+                        </tbody>
+                    </table>
+                ` : ''}
+
+                <h3 style="font-weight: 600; margin: 24px 0 12px;">Daily Entries (${entries.length})</h3>
+                ${entries.length === 0 ? '<div class="empty-state">No entries for this month</div>' : `
+                    <div>
+                        ${entries.map(entry => `
+                            <div class="entry-card">
+                                <div class="entry-header">
+                                    <div class="entry-date">${new Date(entry.date).toLocaleDateString()}</div>
+                                    <button class="btn btn-danger" onclick="deleteDailyEntry('${entry.id}')">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                                <div class="entry-details">
+                                    ${entry.venmo > 0 ? `<div>Venmo: ${entry.venmo.toFixed(2)}</div>` : ''}
+                                    ${entry.check > 0 ? `<div>Check: ${entry.check.toFixed(2)}</div>` : ''}
+                                    ${entry.invoice > 0 ? `<div>Invoice: ${entry.invoice.toFixed(2)}</div>` : ''}
+                                    ${entry.zelle > 0 ? `<div>Zelle: ${entry.zelle.toFixed(2)}</div>` : ''}
+                                    ${entry.stripe > 0 ? `<div>Stripe: ${entry.stripe.toFixed(2)}</div>` : ''}
+                                    ${entry.cash > 0 ? `<div>Cash: ${entry.cash.toFixed(2)}</div>` : ''}
+                                </div>
+                                ${entry.employeeData && entry.employeeData.some(e => e.hours > 0) ? `
+                                    <div style="margin-top: 8px; font-size: 13px;">
+                                        <strong>Employees:</strong> ${entry.employeeData.filter(e => e.hours > 0).map(e => `${e.name} (${e.hours}h)`).join(', ')}
+                                    </div>
+                                ` : ''}
+                                ${entry.expenses.length > 0 ? `
+                                    <div style="margin-top: 8px; font-size: 13px;">
+                                        <strong>Expenses:</strong> ${entry.expenses.map(e => `${e.description} (${e.amount.toFixed(2)})`).join(', ')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            `;
+        }
+
+        function exportCSV(type) {
+            const entries = type === 'weekly' ? getCurrentWeekEntries() : getCurrentMonthEntries();
+            
+            let csv = 'Date,Venmo,Check,Invoice,Zelle,Stripe,Cash,Employee Pay,Hunter Tips,Hunter Draw,Hunter Check,Kullen Tips,Kullen Draw,Kullen Check,Food,Supplies,Gas/Automotive\n';
+            
+            entries.forEach(entry => {
+                const expensesByCategory = { Food: 0, Supplies: 0, 'Gas/Automotive': 0 };
+                entry.expenses.forEach(exp => {
+                    expensesByCategory[exp.category] += exp.amount;
+                });
+                const employeePay = entry.employeeData?.reduce((sum, emp) => sum + emp.pay, 0) || 0;
+                
+                csv += `${entry.date},${entry.venmo},${entry.check},${entry.invoice},${entry.zelle},${entry.stripe},${entry.cash},${employeePay},${entry.hunterTips},${entry.hunterDraw},${entry.hunterCheck},${entry.kullenTips},${entry.kullenDraw},${entry.kullenCheck},${expensesByCategory.Food},${expensesByCategory.Supplies},${expensesByCategory['Gas/Automotive']}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${type}-report-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Initialize on load
+        renderEmployees();
+        renderEmployeeHours();
+    </script>
+</body>
+</html>
