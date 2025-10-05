@@ -325,28 +325,18 @@
             color: #6c757d;
         }
 
-        .detail-section {
-            margin-top: 20px;
+        .owner-section {
             background: white;
             padding: 20px;
             border-radius: 8px;
+            margin-bottom: 15px;
         }
 
-        .detail-section h4 {
+        .owner-section h4 {
             color: #343a40;
             margin-bottom: 15px;
             font-size: 16px;
-        }
-
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .detail-row:last-child {
-            border-bottom: none;
+            font-weight: 600;
         }
 
         @media (max-width: 768px) {
@@ -419,19 +409,41 @@
                     <button class="btn-add" onclick="window.addEmployeeRow()">+ Add Employee</button>
                     <button class="btn btn-secondary" style="margin-left: 10px;" onclick="window.saveEmployees()">Save Employees</button>
 
-                    <h3>Owner Payouts (Hunter & Kullen)</h3>
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label>Weekly Tips (Cash) $</label>
-                            <input type="number" id="weeklyTips" step="0.01" placeholder="0.00">
+                    <h3>Owner Payouts</h3>
+                    
+                    <div class="owner-section">
+                        <h4>Hunter</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Weekly Tips (Cash) $</label>
+                                <input type="number" id="hunterTips" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Cash Draws $</label>
+                                <input type="number" id="hunterCashDraws" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Checks Written $</label>
+                                <input type="number" id="hunterChecks" step="0.01" placeholder="0.00">
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label>Cash Draws $</label>
-                            <input type="number" id="cashDraws" step="0.01" placeholder="0.00">
-                        </div>
-                        <div class="form-group">
-                            <label>Checks Written $</label>
-                            <input type="number" id="checksWritten" step="0.01" placeholder="0.00">
+                    </div>
+
+                    <div class="owner-section">
+                        <h4>Kullen</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Weekly Tips (Cash) $</label>
+                                <input type="number" id="kullenTips" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Cash Draws $</label>
+                                <input type="number" id="kullenCashDraws" step="0.01" placeholder="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Checks Written $</label>
+                                <input type="number" id="kullenChecks" step="0.01" placeholder="0.00">
+                            </div>
                         </div>
                     </div>
 
@@ -472,6 +484,9 @@
                     <h3>Income Breakdown</h3>
                     <div class="breakdown" id="weeklyIncomeBreakdown"></div>
                     
+                    <h3>Owner Payouts Breakdown</h3>
+                    <div class="breakdown" id="weeklyOwnerBreakdown"></div>
+                    
                     <h3>Expense Breakdown</h3>
                     <div class="breakdown" id="weeklyExpenseBreakdown"></div>
                     
@@ -492,6 +507,9 @@
                     
                     <h3>Income Breakdown</h3>
                     <div class="breakdown" id="monthlyIncomeBreakdown"></div>
+                    
+                    <h3>Owner Payouts Breakdown</h3>
+                    <div class="breakdown" id="monthlyOwnerBreakdown"></div>
                     
                     <h3>Expense Breakdown</h3>
                     <div class="breakdown" id="monthlyExpenseBreakdown"></div>
@@ -627,9 +645,16 @@
                 employees: empData.employees,
                 employeeCost: empData.totalPay,
                 ownerPayouts: {
-                    weeklyTips: parseFloat(document.getElementById('weeklyTips').value) || 0,
-                    cashDraws: parseFloat(document.getElementById('cashDraws').value) || 0,
-                    checksWritten: parseFloat(document.getElementById('checksWritten').value) || 0
+                    hunter: {
+                        tips: parseFloat(document.getElementById('hunterTips').value) || 0,
+                        cashDraws: parseFloat(document.getElementById('hunterCashDraws').value) || 0,
+                        checks: parseFloat(document.getElementById('hunterChecks').value) || 0
+                    },
+                    kullen: {
+                        tips: parseFloat(document.getElementById('kullenTips').value) || 0,
+                        cashDraws: parseFloat(document.getElementById('kullenCashDraws').value) || 0,
+                        checks: parseFloat(document.getElementById('kullenChecks').value) || 0
+                    }
                 },
                 expenses: {
                     food: parseFloat(document.getElementById('food').value) || 0,
@@ -648,7 +673,9 @@
 
         window.clearForm = function() {
             const fields = ['venmo', 'check', 'invoice', 'zelle', 'stripe', 'cash', 
-                          'weeklyTips', 'cashDraws', 'checksWritten', 'food', 'supplies', 'gasAuto'];
+                          'hunterTips', 'hunterCashDraws', 'hunterChecks',
+                          'kullenTips', 'kullenCashDraws', 'kullenChecks',
+                          'food', 'supplies', 'gasAuto'];
             
             fields.forEach(field => {
                 const el = document.getElementById(field);
@@ -672,13 +699,18 @@
             let totalCash = 0;
             let totalTaxableIncome = 0;
             let totalEmployeeCost = 0;
-            let totalOwnerPayouts = 0;
             let totalExpenses = 0;
             
             const incomeBreakdown = { venmo: 0, check: 0, invoice: 0, zelle: 0, stripe: 0, cash: 0 };
             const expenseBreakdown = { food: 0, supplies: 0, gasAuto: 0 };
+            const ownerBreakdown = {
+                hunter: { tips: 0, cashDraws: 0, checks: 0, total: 0 },
+                kullen: { tips: 0, cashDraws: 0, checks: 0, total: 0 },
+                total: 0
+            };
 
             entriesSubset.forEach(entry => {
+                // Income
                 Object.keys(entry.income).forEach(key => {
                     incomeBreakdown[key] += entry.income[key];
                     totalIncome += entry.income[key];
@@ -690,17 +722,44 @@
                     }
                 });
                 
+                // Employees
                 totalEmployeeCost += entry.employeeCost || 0;
-                totalOwnerPayouts += (entry.ownerPayouts.weeklyTips + entry.ownerPayouts.cashDraws + entry.ownerPayouts.checksWritten);
                 
+                // Owner Payouts
+                if (entry.ownerPayouts) {
+                    // Handle new structure
+                    if (entry.ownerPayouts.hunter) {
+                        ownerBreakdown.hunter.tips += entry.ownerPayouts.hunter.tips || 0;
+                        ownerBreakdown.hunter.cashDraws += entry.ownerPayouts.hunter.cashDraws || 0;
+                        ownerBreakdown.hunter.checks += entry.ownerPayouts.hunter.checks || 0;
+                    }
+                    if (entry.ownerPayouts.kullen) {
+                        ownerBreakdown.kullen.tips += entry.ownerPayouts.kullen.tips || 0;
+                        ownerBreakdown.kullen.cashDraws += entry.ownerPayouts.kullen.cashDraws || 0;
+                        ownerBreakdown.kullen.checks += entry.ownerPayouts.kullen.checks || 0;
+                    }
+                    // Handle old structure for backward compatibility
+                    if (entry.ownerPayouts.weeklyTips !== undefined) {
+                        ownerBreakdown.hunter.tips += entry.ownerPayouts.weeklyTips || 0;
+                        ownerBreakdown.hunter.cashDraws += entry.ownerPayouts.cashDraws || 0;
+                        ownerBreakdown.hunter.checks += entry.ownerPayouts.checksWritten || 0;
+                    }
+                }
+                
+                // Expenses
                 Object.keys(entry.expenses).forEach(key => {
                     expenseBreakdown[key] += entry.expenses[key];
                     totalExpenses += entry.expenses[key];
                 });
             });
 
+            // Calculate owner totals
+            ownerBreakdown.hunter.total = ownerBreakdown.hunter.tips + ownerBreakdown.hunter.cashDraws + ownerBreakdown.hunter.checks;
+            ownerBreakdown.kullen.total = ownerBreakdown.kullen.tips + ownerBreakdown.kullen.cashDraws + ownerBreakdown.kullen.checks;
+            ownerBreakdown.total = ownerBreakdown.hunter.total + ownerBreakdown.kullen.total;
+
             const weeklyTaxTransfer = totalTaxableIncome * 0.30;
-            const netProfit = totalIncome - totalEmployeeCost - totalOwnerPayouts - totalExpenses - weeklyTaxTransfer;
+            const netProfit = totalIncome - totalEmployeeCost - ownerBreakdown.total - totalExpenses - weeklyTaxTransfer;
 
             return {
                 totalIncome,
@@ -708,11 +767,12 @@
                 totalTaxableIncome,
                 weeklyTaxTransfer,
                 totalEmployeeCost,
-                totalOwnerPayouts,
+                totalOwnerPayouts: ownerBreakdown.total,
                 totalExpenses,
                 netProfit,
                 incomeBreakdown,
-                expenseBreakdown
+                expenseBreakdown,
+                ownerBreakdown
             };
         }
 
@@ -787,7 +847,7 @@
                         <div class="amount ${totals.netProfit >= 0 ? 'positive' : 'negative'}">$${totals.netProfit.toFixed(2)}</div>
                     </div>
                 `;
-            }
+}
             
             const incomeBreakdownContainer = document.getElementById('weeklyIncomeBreakdown');
             if (incomeBreakdownContainer) {
@@ -798,6 +858,44 @@
                             <span class="value">$${value.toFixed(2)}</span>
                         </div>
                     `).join('');
+            }
+            
+            const ownerBreakdownContainer = document.getElementById('weeklyOwnerBreakdown');
+            if (ownerBreakdownContainer) {
+                ownerBreakdownContainer.innerHTML = `
+                    <div class="breakdown-item">
+                        <span class="label">Hunter - Tips</span>
+                        <span class="value">$${totals.ownerBreakdown.hunter.tips.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Hunter - Cash Draws</span>
+                        <span class="value">$${totals.ownerBreakdown.hunter.cashDraws.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Hunter - Checks</span>
+                        <span class="value">$${totals.ownerBreakdown.hunter.checks.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label"><strong>Hunter Total</strong></span>
+                        <span class="value"><strong>$${totals.ownerBreakdown.hunter.total.toFixed(2)}</strong></span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Kullen - Tips</span>
+                        <span class="value">$${totals.ownerBreakdown.kullen.tips.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Kullen - Cash Draws</span>
+                        <span class="value">$${totals.ownerBreakdown.kullen.cashDraws.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Kullen - Checks</span>
+                        <span class="value">$${totals.ownerBreakdown.kullen.checks.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label"><strong>Kullen Total</strong></span>
+                        <span class="value"><strong>$${totals.ownerBreakdown.kullen.total.toFixed(2)}</strong></span>
+                    </div>
+                `;
             }
             
             const expenseBreakdownContainer = document.getElementById('weeklyExpenseBreakdown');
@@ -854,8 +952,7 @@
                     <div class="card">
                         <h3>Taxable Income</h3>
                         <div class="amount neutral">$${totals.totalTaxableIncome.toFixed(2)}</div>
-                    </div
->
+                    </div>
                     <div class="card">
                         <h3>Tax Transfer (30%)</h3>
                         <div class="amount negative">$${totals.weeklyTaxTransfer.toFixed(2)}</div>
@@ -888,6 +985,44 @@
                             <span class="value">$${value.toFixed(2)}</span>
                         </div>
                     `).join('');
+            }
+            
+            const ownerBreakdownContainer = document.getElementById('monthlyOwnerBreakdown');
+            if (ownerBreakdownContainer) {
+                ownerBreakdownContainer.innerHTML = `
+                    <div class="breakdown-item">
+                        <span class="label">Hunter - Tips</span>
+                        <span class="value">$${totals.ownerBreakdown.hunter.tips.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Hunter - Cash Draws</span>
+                        <span class="value">$${totals.ownerBreakdown.hunter.cashDraws.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Hunter - Checks</span>
+                        <span class="value">$${totals.ownerBreakdown.hunter.checks.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label"><strong>Hunter Total</strong></span>
+                        <span class="value"><strong>$${totals.ownerBreakdown.hunter.total.toFixed(2)}</strong></span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Kullen - Tips</span>
+                        <span class="value">$${totals.ownerBreakdown.kullen.tips.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Kullen - Cash Draws</span>
+                        <span class="value">$${totals.ownerBreakdown.kullen.cashDraws.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label">Kullen - Checks</span>
+                        <span class="value">$${totals.ownerBreakdown.kullen.checks.toFixed(2)}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="label"><strong>Kullen Total</strong></span>
+                        <span class="value"><strong>$${totals.ownerBreakdown.kullen.total.toFixed(2)}</strong></span>
+                    </div>
+                `;
             }
             
             const expenseBreakdownContainer = document.getElementById('monthlyExpenseBreakdown');
@@ -974,21 +1109,48 @@
                 return;
             }
             
-            let csv = 'Date,Venmo,Check,Invoice,Zelle,Stripe,Cash,Taxable Income,Tax Transfer (30%),Employee Cost,Weekly Tips,Cash Draws,Checks Written,Total Owner Payouts,Food,Supplies,Gas/Auto,Total Expenses,Total Income,Net Profit\n';
+            let csv = 'Date,Venmo,Check,Invoice,Zelle,Stripe,Cash,Taxable Income,Tax Transfer (30%),Employee Cost,Hunter Tips,Hunter Cash Draws,Hunter Checks,Hunter Total,Kullen Tips,Kullen Cash Draws,Kullen Checks,Kullen Total,Total Owner Payouts,Food,Supplies,Gas/Auto,Total Expenses,Total Income,Net Profit\n';
             
             dataToExport.forEach(entry => {
                 const totalIncome = Object.values(entry.income).reduce((a, b) => a + b, 0);
                 const totalExpenses = Object.values(entry.expenses).reduce((a, b) => a + b, 0);
-                const totalOwnerPayouts = entry.ownerPayouts.weeklyTips + entry.ownerPayouts.cashDraws + entry.ownerPayouts.checksWritten;
                 const taxableIncome = totalIncome - entry.income.cash;
                 const taxTransfer = taxableIncome * 0.30;
+                
+                let hunterTips = 0, hunterCashDraws = 0, hunterChecks = 0;
+                let kullenTips = 0, kullenCashDraws = 0, kullenChecks = 0;
+                
+                if (entry.ownerPayouts) {
+                    if (entry.ownerPayouts.hunter) {
+                        hunterTips = entry.ownerPayouts.hunter.tips || 0;
+                        hunterCashDraws = entry.ownerPayouts.hunter.cashDraws || 0;
+                        hunterChecks = entry.ownerPayouts.hunter.checks || 0;
+                    }
+                    if (entry.ownerPayouts.kullen) {
+                        kullenTips = entry.ownerPayouts.kullen.tips || 0;
+                        kullenCashDraws = entry.ownerPayouts.kullen.cashDraws || 0;
+                        kullenChecks = entry.ownerPayouts.kullen.checks || 0;
+                    }
+                    // Handle old structure
+                    if (entry.ownerPayouts.weeklyTips !== undefined) {
+                        hunterTips = entry.ownerPayouts.weeklyTips || 0;
+                        hunterCashDraws = entry.ownerPayouts.cashDraws || 0;
+                        hunterChecks = entry.ownerPayouts.checksWritten || 0;
+                    }
+                }
+                
+                const hunterTotal = hunterTips + hunterCashDraws + hunterChecks;
+                const kullenTotal = kullenTips + kullenCashDraws + kullenChecks;
+                const totalOwnerPayouts = hunterTotal + kullenTotal;
                 const netProfit = totalIncome - entry.employeeCost - totalOwnerPayouts - totalExpenses - taxTransfer;
                 
                 csv += `${entry.date},`;
                 csv += `${entry.income.venmo},${entry.income.check},${entry.income.invoice},${entry.income.zelle},${entry.income.stripe},${entry.income.cash},`;
                 csv += `${taxableIncome.toFixed(2)},${taxTransfer.toFixed(2)},`;
                 csv += `${entry.employeeCost},`;
-                csv += `${entry.ownerPayouts.weeklyTips},${entry.ownerPayouts.cashDraws},${entry.ownerPayouts.checksWritten},${totalOwnerPayouts},`;
+                csv += `${hunterTips},${hunterCashDraws},${hunterChecks},${hunterTotal},`;
+                csv += `${kullenTips},${kullenCashDraws},${kullenChecks},${kullenTotal},`;
+                csv += `${totalOwnerPayouts},`;
                 csv += `${entry.expenses.food},${entry.expenses.supplies},${entry.expenses.gasAuto},${totalExpenses},`;
                 csv += `${totalIncome},${netProfit.toFixed(2)}\n`;
             });
