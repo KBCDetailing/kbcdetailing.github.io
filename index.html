@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Detailing Business Tracker</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+        }
+        .icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        const { useState, useEffect, createElement: h } = React;
+
+        function AutoDetailingTracker() {
+            const [entries, setEntries] = useState([
+                {
+                    id: 1,
+                    date: '2025-07-07',
+                    incomeCheck: 0,
+                    incomeInvoice: 0,
+                    incomeCash: 350,
+                    incomeVenmo: 308,
+                    incomePaypal: 0,
+                    incomeOther: 0,
+                    gusHours: 8.5,
+                    gusPay: 127.50,
+                    notes: '$350 cash + $308 Venmo'
+                },
+                {
+                    id: 2,
+                    date: '2025-07-08',
+                    incomeCheck: 330,
+                    incomeInvoice: 135,
+                    incomeCash: 0,
+                    incomeVenmo: 0,
+                    incomePaypal: 0,
+                    incomeOther: 0,
+                    gusHours: 6.5,
+                    gusPay: 97.50,
+                    notes: 'Job 1: $330 check + $135 invoice'
+                },
+                {
+                    id: 3,
+                    date: '2025-07-08',
+                    incomeCheck: 0,
+                    incomeInvoice: 0,
+                    incomeCash: 230,
+                    incomeVenmo: 0,
+                    incomePaypal: 0,
+                    incomeOther: 0,
+                    gusHours: 0,
+                    gusPay: 0,
+                    notes: 'Job 2: $230 cash'
+                },
+                {
+                    id: 4,
+                    date: '2025-07-09',
+                    incomeCheck: 400,
+                    incomeInvoice: 0,
+                    incomeCash: 334,
+                    incomeVenmo: 0,
+                    incomePaypal: 0,
+                    incomeOther: 0,
+                    gusHours: 8.5,
+                    gusPay: 127.50,
+                    notes: '6:30am-3:00pm, $400 check + $334 cash'
+                }
+            ]);
+
+            const [newEntry, setNewEntry] = useState({
+                date: new Date().toISOString().split('T')[0],
+                incomeCheck: '',
+                incomeInvoice: '',
+                incomeCash: '',
+                incomeVenmo: '',
+                incomePaypal: '',
+                incomeOther: '',
+                gusHours: '',
+                notes: ''
+            });
+
+            const [searchQuery, setSearchQuery] = useState('');
+            const [searchResults, setSearchResults] = useState('');
+            const [editingId, setEditingId] = useState(null);
+            const [editingEntry, setEditingEntry] = useState({});
+            const [weekOffset, setWeekOffset] = useState(0);
+            const [saveStatus, setSaveStatus] = useState('');
+
+            // Load data from localStorage on startup
+            useEffect(() => {
+                const savedData = localStorage.getItem('autoDetailingData');
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        setEntries(parsed);
+                        setSaveStatus('✅ Data loaded from storage');
+                        setTimeout(() => setSaveStatus(''), 3000);
+                    } catch (error) {
+                        console.error('Error loading saved data:', error);
+                        setSaveStatus('❌ Error loading saved data');
+                        setTimeout(() => setSaveStatus(''), 3000);
+                    }
+                }
+            }, []);
+
+            // Auto-save when entries change
+            useEffect(() => {
+                if (entries.length > 0) {
+                    try {
+                        localStorage.setItem('autoDetailingData', JSON.stringify(entries));
+                    } catch (error) {
+                        console.error('Error auto-saving:', error);
+                    }
+                }
+            }, [entries]);
+
+            const hardSave = () => {
+                try {
+                    localStorage.setItem('autoDetailingData', JSON.stringify(entries));
+                    setSaveStatus('✅ Data saved successfully!');
+                    setTimeout(() => setSaveStatus(''), 3000);
+                } catch (error) {
+                    setSaveStatus('❌ Error saving data');
+                    setTimeout(() => setSaveStatus(''), 3000);
+                }
+            };
+
+            const loadData = () => {
+                const savedData = localStorage.getItem('autoDetailingData');
+                if (savedData) {
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        setEntries(parsed);
+                        setSaveStatus('✅ Data loaded successfully!');
+                        setTimeout(() => setSaveStatus(''), 3000);
+                    } catch (error) {
+                        setSaveStatus('❌ Error loading data');
+                        setTimeout(() => setSaveStatus(''), 3000);
+                    }
+                } else {
+                    setSaveStatus('ℹ️ No saved data found');
+                    setTimeout(() => setSaveStatus(''), 3000);
+                }
+            };
+
+            const clearAllData = () => {
+                if (window.confirm('Are you sure you want to clear ALL data? This cannot be undone!')) {
+                    localStorage.removeItem('autoDetailingData');
+                    setEntries([]);
+                    setSaveStatus('🗑️ All data cleared');
+                    setTimeout(() => setSaveStatus(''), 3000);
+                }
+            };
+
+            const formatDate = (dateString) => {
+                const [year, month, day] = dateString.split('-');
+                const date = new Date(year, month - 1, day);
+                return date.toLocaleDateString();
+            };
+
+            const getWeekRange = (offset) => {
+                const today = new Date();
+                const startOfWeek = new Date(today);
+                startOfWeek.setDate(today.getDate() - today.getDay() - (offset * 7));
+                startOfWeek.setHours(0, 0, 0, 0);
+                
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setDate(startOfWeek.getDate() + 6);
+                endOfWeek.setHours(23, 59, 59, 999);
+
+                return { startOfWeek, endOfWeek };
+            };
+
+            const getWeekLabel = (offset) => {
+                if (offset === 0) return "This Week";
+                if (offset === 1) return "Last Week";
+                if (offset === -1) return "Next Week";
+                
+                const { startOfWeek } = getWeekRange(offset);
+                const month = startOfWeek.toLocaleDateString('en-US', { month: 'short' });
+                const day = startOfWeek.getDate();
+                const year = startOfWeek.getFullYear();
+                
+                if (offset > 0) {
+                    return `${offset} weeks ago (${month} ${day}, ${year})`;
+                } else {
+                    return `${Math.abs(offset)} weeks ahead (${month} ${day}, ${year})`;
+                }
+            };
+
+            const startEditing = (entry) => {
+                setEditingId(entry.id);
+                setEditingEntry({...entry});
+            };
+
+            const cancelEditing = () => {
+                setEditingId(null);
+                setEditingEntry({});
+            };
+
+            const saveEditing = () => {
+                const updatedEntries = entries.map(entry => {
+                    if (entry.id === editingId) {
+                        return {
+                            ...editingEntry,
+                            incomeCheck: parseFloat(editingEntry.incomeCheck) || 0,
+                            incomeInvoice: parseFloat(editingEntry.incomeInvoice) || 0,
+                            incomeCash: parseFloat(editingEntry.incomeCash) || 0,
+                            incomeVenmo: parseFloat(editingEntry.incomeVenmo) || 0,
+                            incomePaypal: parseFloat(editingEntry.incomePaypal) || 0,
+                            incomeOther: parseFloat(editingEntry.incomeOther) || 0,
+                            gusHours: parseFloat(editingEntry.gusHours) || 0,
+                            gusPay: (parseFloat(editingEntry.gusHours) || 0) * 15
+                        };
+                    }
+                    return entry;
+                });
+                setEntries(updatedEntries);
+                setEditingId(null);
+                setEditingEntry({});
+            };
+
+            const deleteEntry = (id) => {
+                if (window.confirm('Are you sure you want to delete this entry?')) {
+                    setEntries(entries.filter(entry => entry.id !== id));
+                }
+            };
+
+            const exportToCSV = () => {
+                const headers = ['Date', 'Check', 'Invoice', 'Cash', 'Venmo', 'PayPal', 'Other', 'Total Income', 'Gus Hours', 'Gus Pay', 'Net Income', 'Notes'];
+                const csvData = entries.map(entry => [
+                    entry.date,
+                    entry.incomeCheck,
+                    entry.incomeInvoice,
+                    entry.incomeCash,
+                    entry.incomeVenmo,
+                    entry.incomePaypal,
+                    entry.incomeOther,
+                    getTotalIncome(entry),
+                    entry.gusHours,
+                    entry.gusPay,
+                    getTotalIncome(entry) - entry.gusPay,
+                    entry.notes
+                ]);
+                
+                const csvContent = [headers, ...csvData]
+                    .map(row => row.map(field => `"${field}"`).join(','))
+                    .join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `auto_detailing_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+            };
+
+            const getTotalIncome = (entry) => {
+                return entry.incomeCheck + entry.incomeInvoice + entry.incomeCash + entry.incomeVenmo + entry.incomePaypal + entry.incomeOther;
+            };
+
+            const getPaymentBreakdown = (offset = 0) => {
+                const { startOfWeek, endOfWeek } = getWeekRange(offset);
+
+                const weekEntries = entries.filter(entry => {
+                    const entryDate = new Date(entry.date);
+                    return entryDate >= startOfWeek && entryDate <= endOfWeek;
+                });
+
+                return {
+                    cash: weekEntries.reduce((sum, entry) => sum + entry.incomeCash, 0),
+                    check: weekEntries.reduce((sum, entry) => sum + entry.incomeCheck, 0),
+                    invoice: weekEntries.reduce((sum, entry) => sum + entry.incomeInvoice, 0),
+                    venmo: weekEntries.reduce((sum, entry) => sum + entry.incomeVenmo, 0),
+                    paypal: weekEntries.reduce((sum, entry) => sum + entry.incomePaypal, 0),
+                    other: weekEntries.reduce((sum, entry) => sum + entry.incomeOther, 0)
+                };
+            };
+
+            const getWeeklyData = (offset = 0) => {
+                const { startOfWeek, endOfWeek } = getWeekRange(offset);
+
+                const weekEntries = entries.filter(entry => {
+                    const entryDate = new Date(entry.date);
+                    return entryDate >= startOfWeek && entryDate <= endOfWeek;
+                });
+
+                const totalIncome = weekEntries.reduce((sum, entry) => sum + getTotalIncome(entry), 0);
+                const totalGusPay = weekEntries.reduce((sum, entry) => sum + entry.gusPay, 0);
+                const totalGusHours = weekEntries.reduce((sum, entry) => sum + entry.gusHours, 0);
+
+                return { weekEntries, totalIncome, totalGusPay, totalGusHours, startOfWeek, endOfWeek };
+            };
+
+            const addEntry = () => {
+                const newId = Math.max(...entries.map(e => e.id), 0) + 1;
+                const entry = {
+                    id: newId,
+                    date: newEntry.date,
+                    incomeCheck: parseFloat(newEntry.incomeCheck) || 0,
+                    incomeInvoice: parseFloat(newEntry.incomeInvoice) || 0,
+                    incomeCash: parseFloat(newEntry.incomeCash) || 0,
+                    incomeVenmo: parseFloat(newEntry.incomeVenmo) || 0,
+                    incomePaypal: parseFloat(newEntry.incomePaypal) || 0,
+                    incomeOther: parseFloat(newEntry.incomeOther) || 0,
+                    gusHours: parseFloat(newEntry.gusHours) || 0,
+                    gusPay: (parseFloat(newEntry.gusHours) || 0) * 15,
+                    notes: newEntry.notes
+                };
+
+                setEntries([...entries, entry]);
+                setNewEntry({
+                    date: new Date().toISOString().split('T')[0],
+                    incomeCheck: '',
+                    incomeInvoice: '',
+                    incomeCash: '',
+                    incomeVenmo: '',
+                    incomePaypal: '',
+                    incomeOther: '',
+                    gusHours: '',
+                    notes: ''
+                });
+            };
+
+            const handleSearch = () => {
+                const query = searchQuery.toLowerCase();
+                let result = '';
+
+                if (query.includes('last week') || query.includes('previous week')) {
+                    const { totalIncome, totalGusPay, totalGusHours } = getWeeklyData(1);
+                    result = `Last week: Made $${totalIncome.toFixed(2)}, Paid Gus $${totalGusPay.toFixed(2)} for ${totalGusHours} hours`;
+                } else if (query.includes('this week')) {
+                    const { totalIncome, totalGusPay, totalGusHours } = getWeeklyData(0);
+                    result = `This week: Made $${totalIncome.toFixed(2)}, Paid Gus $${totalGusPay.toFixed(2)} for ${totalGusHours} hours`;
+                } else if (query.includes('gus') && (query.includes('week') || query.includes('paid'))) {
+                    const { totalGusPay, totalGusHours } = getWeeklyData(weekOffset);
+                    result = `${getWeekLabel(weekOffset)}: Paid Gus $${totalGusPay.toFixed(2)} for ${totalGusHours} hours`;
+                } else if (query.includes('made') && query.includes('week')) {
+                    const { totalIncome } = getWeeklyData(weekOffset);
+                    result = `${getWeekLabel(weekOffset)}: Total income $${totalIncome.toFixed(2)}`;
+                } else {
+                    result = 'Try queries like: "what did I make this week?", "what did I pay Gus this week?", "last week totals"';
+                }
+
+                setSearchResults(result);
+            };
+
+            const currentWeek = getWeeklyData(weekOffset);
+            const currentBreakdown = getPaymentBreakdown(weekOffset);
+
+            // Get entries for current viewing week
+            const { startOfWeek, endOfWeek } = getWeekRange(weekOffset);
+            const weekEntries = entries.filter(entry => {
+                const entryDate = new Date(entry.date);
+                return entryDate >= startOfWeek && entryDate <= endOfWeek;
+            });
+
+            return h('div', { className: "max-w-6xl mx-auto p-6 bg-gray-50 min-h-screen" },
+                h('div', { className: "bg-white rounded-lg shadow-lg p-6 mb-6" },
+                    h('h1', { className: "text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2" },
+                        h('span', { className: "text-green-600" }, "💰"),
+                        "Auto Detailing Business Tracker"
+                    ),
+                    h('p', { className: "text-gray-600 mb-4" }, "Track daily income and Gus's hours/pay"),
+                    
+                    // Save Controls
+                    h('div', { className: "flex flex-wrap gap-2 mb-4" },
+                        h('button', {
+                            onClick: hardSave,
+                            className: "px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+                        },
+                            h('span', null, "💾"),
+                            "Save Data"
+                        ),
+                        h('button', {
+                            onClick: loadData,
+                            className: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                        },
+                            h('span', null, "📥"),
+                            "Load Data"
+                        ),
+                        h('button', {
+                            onClick: exportToCSV,
+                            className: "px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center gap-2"
+                        },
+                            h('span', null, "📊"),
+                            "Export CSV"
+                        ),
+                        h('button', {
+                            onClick: clearAllData,
+                            className: "px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center gap-2"
+                        },
+                            h('span', null, "🗑️"),
+                            "Clear All"
+                        )
+                    ),
+                    
+                    // Save Status
+                    saveStatus && h('div', { className: "text-sm font-medium mb-2" }, saveStatus)
+                ),
+
+                // Week Navigation
+                h('div', { className: "bg-white rounded-lg shadow p-6 mb-6" },
+                    h('div', { className: "flex items-center justify-between mb-4" },
+                        h('button', {
+                            onClick: () => setWeekOffset(weekOffset + 1),
+                            className: "px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2"
+                        },
+                            h('span', null, "⬅️"),
+                            "Previous Week"
+                        ),
+                        h('h3', { className: "text-xl font-semibold text-gray-800" }, 
+                            getWeekLabel(weekOffset)
+                        ),
+                        h('button', {
+                            onClick: () => setWeekOffset(weekOffset - 1),
+                            className: "px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 flex items-center gap-2",
+                            disabled: weekOffset <= 0
+                        },
+                            "Next Week",
+                            h('span', null, "➡️")
+                        )
+                    ),
+                    h('div', { className: "text-center text-sm text-gray-600" },
+                        `${startOfWeek.toLocaleDateString()} - ${endOfWeek.toLocaleDateString()}`
+                    )
+                ),
+
+                // Quick Stats for Current Week
+                h('div', { className: "bg-white rounded-lg shadow p-6 mb-6" },
+                    h('h3', { className: "text-lg font-semibold text-gray-800 mb-4" }, 
+                        `${getWeekLabel(weekOffset)} Summary`
+                    ),
+                    h('div', { className: "grid grid-cols-2 md:grid-cols-4 gap-4" },
+                        h('div', { className: "text-center" },
+                            h('p', { className: "text-2xl font-bold text-green-600" }, 
+                                `$${currentWeek.totalIncome.toFixed(2)}`
+                            ),
+                            h('p', { className: "text-sm text-gray-600" }, "Total Income")
+                        ),
+                        h('div', { className: "text-center" },
+                            h('p', { className: "text-2xl font-bold text-blue-600" }, 
+                                currentWeek.totalGusHours
+                            ),
+                            h('p', { className: "text-sm text-gray-600" }, "Gus Hours")
+                        ),
+                        h('div', { className: "text-center" },
+                            h('p', { className: "text-2xl font-bold text-red-600" }, 
+                                `$${currentWeek.totalGusPay.toFixed(2)}`
+                            ),
+                            h('p', { className: "text-sm text-gray-600" }, "Gus Pay")
+                        ),
+                        h('div', { className: "text-center" },
+                            h('p', { className: "text-2xl font-bold text-purple-600" }, 
+                                `$${(currentWeek.totalIncome - currentWeek.totalGusPay).toFixed(2)}`
+                            ),
+                            h('p', { className: "text-sm text-gray-600" }, "Net Profit")
+                        )
+                    )
+                ),
+
+                // Payment Method Breakdown for Current Week
+                h('div', { className: "bg-white rounded-lg shadow p-6 mb-6" },
+                    h('h3', { className: "text-lg font-semibold text-gray-800 mb-4" }, 
+                        `${getWeekLabel(weekOffset)} Payment Breakdown`
+                    ),
+                    h('div', { className: "grid grid-cols-2 md:grid-cols-3 gap-4" },
+                        h('div', { className: "flex justify-between items-center py-2 border-b" },
+                            h('span', { className: "text-gray-600" }, "💵 Cash:"),
+                            h('span', { className: "font-medium text-green-600" }, `$${currentBreakdown.cash.toFixed(2)}`)
+                        ),
+                        h('div', { className: "flex justify-between items-center py-2 border-b" },
+                            h('span', { className: "text-gray-600" }, "📝 Check:"),
+                            h('span', { className: "font-medium text-blue-600" }, `$${currentBreakdown.check.toFixed(2)}`)
+                        ),
+                        h('div', { className: "flex justify-between items-center py-2 border-b" },
+                            h('span', { className: "text-gray-600" }, "📄 Invoice:"),
+                            h('span', { className: "font-medium text-purple-600" }, `$${currentBreakdown.invoice.toFixed(2)}`)
+                        ),
+                        h('div', { className: "flex justify-between items-center py-2 border-b" },
+                            h('span', { className: "text-gray-600" }, "📱 Venmo:"),
+                            h('span', { className: "font-medium text-indigo-600" }, `$${currentBreakdown.venmo.toFixed(2)}`)
+                        ),
+                        h('div', { className: "flex justify-between items-center py-2 border-b" },
+                            h('span', { className: "text-gray-600" }, "💳 PayPal:"),
+                            h('span', { className: "font-medium text-yellow-600" }, `$${currentBreakdown.paypal.toFixed(2)}`)
+                        ),
+                        h('div', { className: "flex justify-between items-center py-2 border-b" },
+                            h('span', { className: "text-gray-600" }, "🔄 Other:"),
+                            h('span', { className: "font-medium text-gray-600" }, `$${currentBreakdown.other.toFixed(2)}`)
+                        )
+                    )
+                ),
+
+                // Search/Query
+                h('div', { className: "bg-white rounded-lg shadow p-6 mb-6" },
+                    h('h3', { className: "text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2" },
+                        h('span', null, "🔍"),
+                        "Ask Questions"
+                    ),
+                    h('div', { className: "flex gap-2 mb-4" },
+                        h('input', {
+                            type: "text",
+                            value: searchQuery,
+                            onChange: (e) => setSearchQuery(e.target.value),
+                            placeholder: "Ask: 'what did I make this week?' or 'what did I pay Gus this week?'",
+                            className: "flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500",
+                            onKeyPress: (e) => e.key === 'Enter' && handleSearch()
+                        }),
+                        h('button', {
+                            onClick: handleSearch,
+                            className: "px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+                        },
+                            h('span', null, "🔍"),
+                            "Ask"
+                        )
+                    ),
+                    searchResults && h('div', { className: "bg-blue-50 border border-blue-200 rounded-md p-3" },
+                        h('p', { className: "text-blue-800 font-medium" }, searchResults)
+                    )
+                ),
+
+                // Add New Entry
+                h('div', { className: "bg-white rounded-lg shadow p-6 mb-6" },
+                    h('h3', { className: "text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2" },
+                        h('span', null, "➕"),
+                        "Add New Day"
+                    ),
+                    h('div', { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-4" },
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Date"),
+                            h('input', {
+                                type: "date",
+                                value: newEntry.date,
+                                onChange: (e) => setNewEntry({...newEntry, date: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Check $"),
+                            h('input', {
+                                type: "number",
+                                step: "0.01",
+                                value: newEntry.incomeCheck,
+                                onChange: (e) => setNewEntry({...newEntry, incomeCheck: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Invoice $"),
+                            h('input', {
+                                type: "number",
+                                step: "0.01",
+                                value: newEntry.incomeInvoice,
+                                onChange: (e) => setNewEntry({...newEntry, incomeInvoice: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Cash $"),
+                            h('input', {
+                                type: "number",
+                                step: "0.01",
+                                value: newEntry.incomeCash,
+                                onChange: (e) => setNewEntry({...newEntry, incomeCash: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Venmo $"),
+                            h('input', {
+                                type: "number",
+                                step: "0.01",
+                                value: newEntry.incomeVenmo,
+                                onChange: (e) => setNewEntry({...newEntry, incomeVenmo: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "PayPal $"),
+                            h('input', {
+                                type: "number",
+                                step: "0.01",
+                                value: newEntry.incomePaypal,
+                                onChange: (e) => setNewEntry({...newEntry, incomePaypal: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Other $"),
+                            h('input', {
+                                type: "number",
+                                step: "0.01",
+                                value: newEntry.incomeOther,
+                                onChange: (e) => setNewEntry({...newEntry, incomeOther: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Gus Hours"),
+                            h('input', {
+                                type: "number",
+                                step: "0.5",
+                                value: newEntry.gusHours,
+                                onChange: (e) => setNewEntry({...newEntry, gusHours: e.target.value}),
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            })
+                        ),
+                        h('div', null,
+                            h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Gus Pay"),
+                            h('input', {
+                                type: "text",
+                                value: `$${((parseFloat(newEntry.gusHours) || 0) * 15).toFixed(2)}`,
+                                disabled: true,
+                                className: "w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100"
+                            })
+                        )
+                    ),
+                    h('div', { className: "mb-4" },
+                        h('label', { className: "block text-sm font-medium text-gray-700 mb-1" }, "Notes"),
+                        h('input', {
+                            type: "text",
+                            value: newEntry.notes,
+                            onChange: (e) => setNewEntry({...newEntry, notes: e.target.value}),
+                            placeholder: "Job details, pending work, etc.",
+                            className: "w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        })
+                    ),
+                    h('button', {
+                        onClick: addEntry,
+                        className: "px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+                    },
+                        h('span', null, "➕"),
+                        "Add Entry"
+                    )
+                ),
+
+                // Entries Table for Current Week
+                h('div', { className: "bg-white rounded-lg shadow overflow-hidden" },
+                    h('div', { className: "px-6 py-4 border-b border-gray-200" },
+                        h('h3', { className: "text-lg font-semibold text-gray-800" }, 
+                            `${getWeekLabel(weekOffset)} Records (${weekEntries.length} entries)`
+                        )
+                    ),
+                    weekEntries.length > 0 ? 
+                        h('div', { className: "overflow-x-auto" },
+                            h('table', { className: "w-full" },
+                                h('thead', { className: "bg-gray-50" },
+                                    h('tr', null,
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Date"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Check"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Invoice"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Cash"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Venmo"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "PayPal"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Total"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Gus Hrs"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Gus Pay"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Net"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Notes"),
+                                        h('th', { className: "px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" }, "Actions")
+                                    )
+                                ),
+                                h('tbody', { className: "bg-white divide-y divide-gray-200" },
+                                    weekEntries.slice().reverse().map((entry) => 
+                                        h('tr', { key: entry.id, className: "hover:bg-gray-50" },
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "date",
+                                                        value: editingEntry.date,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, date: e.target.value}),
+                                                        className: "w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    formatDate(entry.date)
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "number",
+                                                        step: "0.01",
+                                                        value: editingEntry.incomeCheck,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, incomeCheck: e.target.value}),
+                                                        className: "w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    `$${entry.incomeCheck.toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "number",
+                                                        step: "0.01",
+                                                        value: editingEntry.incomeInvoice,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, incomeInvoice: e.target.value}),
+                                                        className: "w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    `$${entry.incomeInvoice.toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "number",
+                                                        step: "0.01",
+                                                        value: editingEntry.incomeCash,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, incomeCash: e.target.value}),
+                                                        className: "w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    `$${entry.incomeCash.toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "number",
+                                                        step: "0.01",
+                                                        value: editingEntry.incomeVenmo,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, incomeVenmo: e.target.value}),
+                                                        className: "w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    `$${entry.incomeVenmo.toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "number",
+                                                        step: "0.01",
+                                                        value: editingEntry.incomePaypal,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, incomePaypal: e.target.value}),
+                                                        className: "w-20 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    `$${entry.incomePaypal.toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600" },
+                                                editingId === entry.id ?
+                                                    `$${((parseFloat(editingEntry.incomeCheck) || 0) + 
+                                                         (parseFloat(editingEntry.incomeInvoice) || 0) + 
+                                                         (parseFloat(editingEntry.incomeCash) || 0) + 
+                                                         (parseFloat(editingEntry.incomeVenmo) || 0) + 
+                                                         (parseFloat(editingEntry.incomePaypal) || 0) + 
+                                                         (parseFloat(editingEntry.incomeOther) || 0)).toFixed(2)}` :
+                                                    `$${getTotalIncome(entry).toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-gray-900" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "number",
+                                                        step: "0.5",
+                                                        value: editingEntry.gusHours,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, gusHours: e.target.value}),
+                                                        className: "w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+                                                    }) :
+                                                    entry.gusHours
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm text-red-600" },
+                                                editingId === entry.id ?
+                                                    `$${((parseFloat(editingEntry.gusHours) || 0) * 15).toFixed(2)}` :
+                                                    `$${entry.gusPay.toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600" },
+                                                editingId === entry.id ?
+                                                    `$${(((parseFloat(editingEntry.incomeCheck) || 0) + 
+                                                          (parseFloat(editingEntry.incomeInvoice) || 0) + 
+                                                          (parseFloat(editingEntry.incomeCash) || 0) + 
+                                                          (parseFloat(editingEntry.incomeVenmo) || 0) + 
+                                                          (parseFloat(editingEntry.incomePaypal) || 0) + 
+                                                          (parseFloat(editingEntry.incomeOther) || 0)) - 
+                                                         ((parseFloat(editingEntry.gusHours) || 0) * 15)).toFixed(2)}` :
+                                                    `$${(getTotalIncome(entry) - entry.gusPay).toFixed(2)}`
+                                            ),
+                                            h('td', { className: "px-6 py-4 text-sm text-gray-500" },
+                                                editingId === entry.id ?
+                                                    h('input', {
+                                                        type: "text",
+                                                        value: editingEntry.notes,
+                                                        onChange: (e) => setEditingEntry({...editingEntry, notes: e.target.value}),
+                                                        className: "w-full px-2 py-1 border border-gray-300 rounded text-sm",
+                                                        placeholder: "Notes"
+                                                    }) :
+                                                    h('span', { className: "max-w-xs truncate block" }, entry.notes)
+                                            ),
+                                            h('td', { className: "px-6 py-4 whitespace-nowrap text-sm" },
+                                                editingId === entry.id ?
+                                                    h('div', { className: "flex space-x-2" },
+                                                        h('button', {
+                                                            onClick: saveEditing,
+                                                            className: "text-green-600 hover:text-green-900",
+                                                            title: "Save"
+                                                        }, "💾"),
+                                                        h('button', {
+                                                            onClick: cancelEditing,
+                                                            className: "text-gray-600 hover:text-gray-900",
+                                                            title: "Cancel"
+                                                        }, "❌")
+                                                    ) :
+                                                    h('div', { className: "flex space-x-2" },
+                                                        h('button', {
+                                                            onClick: () => startEditing(entry),
+                                                            className: "text-blue-600 hover:text-blue-900",
+                                                            title: "Edit"
+                                                        }, "✏️"),
+                                                        h('button', {
+                                                            onClick: () => deleteEntry(entry.id),
+                                                            className: "text-red-600 hover:text-red-900",
+                                                            title: "Delete"
+                                                        }, "🗑️")
+                                                    )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        ) :
+                        h('div', { className: "px-6 py-8 text-center text-gray-500" },
+                            h('p', null, `No entries found for ${getWeekLabel(weekOffset).toLowerCase()}.`),
+                            h('p', { className: "text-sm mt-2" }, "Add some entries above or navigate to a different week.")
+                        )
+                )
+            );
+        }
+
+        ReactDOM.render(React.createElement(AutoDetailingTracker), document.getElementById('root'));
+    </script>
+</body>
+</html>
